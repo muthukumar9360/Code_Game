@@ -20,7 +20,7 @@ const Home = () => {
       </nav>
 
       {/* CENTER CONTENT */}
-      <div className="flex flex-col items-center justify-center flex-grow text-center px-4">
+      <div className="flex flex-col items-center justify-center grow text-center px-4">
         
         <img
           src="/logo.jpg"   // replace with your center logo image
