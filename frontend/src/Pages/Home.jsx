@@ -1,10 +1,10 @@
-import React from "react";
+import React, {useState} from "react";
 import { useNavigate } from "react-router-dom";
 import { FaUserCircle } from "react-icons/fa";
 
 const Home = () => {
   const navigate = useNavigate();
-
+  const [menuOpen, setMenuOpen] = useState(false);
   return (
     <div
       className="min-h-screen flex flex-col bg-center bg-no-repeat bg-cover"
@@ -22,12 +22,31 @@ const Home = () => {
           <a href="#" className="hover:text-orange-400 transition">About</a>
           <a href="#" className="hover:text-orange-400 transition">Contact</a>
 
-          {/* USER ICON BUTTON */}
-          <FaUserCircle
-            size={38}
-            onClick={() => navigate("/login")}
-            className="cursor-pointer hover:text-orange-400 transition"
-          />
+          {/* USER ICON BUTTON WITH DROPDOWN */}
+          <div className="relative">
+            <FaUserCircle
+              size={38}
+              onClick={() => setMenuOpen(!menuOpen)}
+              className="cursor-pointer hover:text-orange-400 transition"
+            />
+
+            {menuOpen && (
+              <div className="absolute right-0 mt-2 w-40 bg-white text-[#0f2735] rounded-xl shadow-lg overflow-hidden z-50">
+                <button
+                  onClick={() => navigate("/login")}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium"
+                >
+                  Login
+                </button>
+                <button
+                  onClick={() => navigate("/signup")}
+                  className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium"
+                >
+                  Sign Up
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 

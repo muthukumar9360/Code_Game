@@ -1,6 +1,34 @@
-import React from "react";
+import React, {useState} from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
 
 const Login = () => {
+  const [name, setName] = useState("");
+  const [password, setPassword] = useState("");
+  const navigate = useNavigate();
+  const API=import.meta.env.VITE_API_URL;
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    console.log(`${API}`);
+    try {
+      const response = await axios.post(
+      `${API}/login`,
+      { name, password }
+    );
+    console.log("API callled");
+    if(response.status===201 || response.status===200){
+      navigate("/");
+    }
+    else{
+      alert("Login failed. Please check your credentials.");
+    }
+    console.log(response.data);
+  } catch (err) {
+    console.error(err);
+  }
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="flex w-[950px] h-[550px] shadow-2xl rounded-2xl overflow-hidden">
@@ -21,13 +49,15 @@ const Login = () => {
             Login
           </h2>
 
-          <form className="flex flex-col gap-6">
+          <form className="flex flex-col gap-6" onSubmit={handleSubmit}>
 
             <div>
               <label className="font-semibold text-gray-700">Username or Email</label>
               <input
                 type="text"
                 placeholder="Enter username"
+                value={name}
+                onChange={(e)=>setName(e.target.value)}
                 className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
                            focus:ring-2 focus:ring-orange-400"
               />
@@ -38,6 +68,8 @@ const Login = () => {
               <input
                 type="password"
                 placeholder="Enter password"
+                value={password}
+                onChange={(e)=>setPassword(e.target.value)}
                 className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
                            focus:ring-2 focus:ring-orange-400"
               />
