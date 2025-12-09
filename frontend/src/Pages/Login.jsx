@@ -24,7 +24,7 @@ const Login = () => {
           <form className="flex flex-col gap-6">
 
             <div>
-              <label className="font-semibold text-gray-700">Username</label>
+              <label className="font-semibold text-gray-700">Username or Email</label>
               <input
                 type="text"
                 placeholder="Enter username"
