@@ -1,7 +1,8 @@
 import express from 'express';
 import User from '../models/User.js';
 import crypto from 'crypto';
-
+import jwt from "jsonwebtoken";
+import { authMiddleware } from '../middleware/auth.js';
 const router = express.Router();
 
 // Hash password helper
@@ -12,11 +13,11 @@ const hashPassword = (password) => {
 // Create/Signup new user
 router.post('/signup', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, fullname, email, password } = req.body;
 
     // Validation
-    if (!username || !email || !password) {
-      return res.status(400).json({ error: 'Username, email, and password are required' });
+    if (!username || !email || !password || !fullname) {
+      return res.status(400).json({ error: 'Username, email, fullname, and password are required' });
     }
 
     // Check if user exists
@@ -28,12 +29,13 @@ router.post('/signup', async (req, res) => {
     // Create new user
     const newUser = new User({
       username,
+      fullname,
       email,
       passwordHash: hashPassword(password)
     });
 
     await newUser.save();
-    console.log('✅ User created:', username);
+    console.log('User created:', username);
 
     res.status(201).json({
       message: 'User created successfully',
@@ -45,7 +47,7 @@ router.post('/signup', async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('❌ Signup error:', error.message);
+    console.error('Signup error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -53,15 +55,19 @@ router.post('/signup', async (req, res) => {
 // Login user
 router.post('/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { name, password } = req.body;
 
-    if (!email || !password) {
+    if (!name || !password) {
       return res.status(400).json({ error: 'Email and password are required' });
     }
 
-    const user = await User.findOne({ email });
+    let user = await User.findOne({ email:name });
     if (!user) {
-      return res.status(401).json({ error: 'Invalid credentials' });
+      user=await User.findOne({ username:name });
+      if(!user)
+      {
+        return res.status(401).json({ error: 'Invalid credentials' });
+      }
     }
 
     const passwordHash = hashPassword(password);
@@ -69,32 +75,37 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    console.log('✅ User logged in:', email);
+    console.log('User logged in:', name);
 
-    res.json({
-      message: 'Login successful',
+    const token = jwt.sign(
+      { id: user._id, username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    res.status(201).json({
+      message: "User created successfully",
+      token, // JWT returned on signup
       user: {
         id: user._id,
         username: user.username,
         email: user.email,
         tier: user.tier,
-        xp: user.xp,
-        coins: user.coins
       }
     });
   } catch (error) {
-    console.error('❌ Login error:', error.message);
+    console.error('Login error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
 
 // Get all users
-router.get('/all', async (req, res) => {
+router.get('/all',authMiddleware, async (req, res) => {
   try {
     const users = await User.find().select('-passwordHash');
     res.json({ count: users.length, users });
   } catch (error) {
-    console.error('❌ Error fetching users:', error.message);
+    console.error('Error fetching users:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -108,7 +119,7 @@ router.get('/:id', async (req, res) => {
     }
     res.json(user);
   } catch (error) {
-    console.error('❌ Error fetching user:', error.message);
+    console.error('Error fetching user:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -128,10 +139,10 @@ router.put('/:id', async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    console.log('✅ User updated:', req.params.id);
+    console.log('User updated:', req.params.id);
     res.json({ message: 'User updated', user: updatedUser });
   } catch (error) {
-    console.error('❌ Update error:', error.message);
+    console.error('Update error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });
@@ -143,10 +154,10 @@ router.delete('/:id', async (req, res) => {
     if (!deletedUser) {
       return res.status(404).json({ error: 'User not found' });
     }
-    console.log('✅ User deleted:', req.params.id);
+    console.log('User deleted:', req.params.id);
     res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    console.error('❌ Delete error:', error.message);
+    console.error('Delete error:', error.message);
     res.status(500).json({ error: error.message });
   }
 });

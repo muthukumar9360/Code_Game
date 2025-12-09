@@ -9,6 +9,10 @@ const userSchema = new Schema({
         required: true,
         trim: true
     },
+    fullname:{
+        type:String,
+        required:true
+    },
     email: {
         type: String,
         unique: true,
