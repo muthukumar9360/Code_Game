@@ -1,21 +1,33 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
+import { FaUserCircle } from "react-icons/fa";
 
 const Home = () => {
+  const navigate = useNavigate();
+
   return (
     <div
       className="min-h-screen flex flex-col bg-center bg-no-repeat bg-cover"
-      style={{ backgroundImage: "url('/bg.png')" }} // replace with your centered bg image
+      style={{ backgroundImage: "url('/bg.png')" }} 
     >
+
       {/* NAVBAR */}
       <nav className="w-full py-5 flex justify-between items-center px-10 bg-[#0f2735] bg-opacity-80 shadow-md">
         <h1 className="text-3xl font-extrabold text-white tracking-wide">
           BATT<span className="text-orange-500">LIX</span>
         </h1>
 
-        <div className="flex gap-8 text-white font-semibold text-lg">
+        <div className="flex gap-8 items-center text-white font-semibold text-lg">
           <a href="#" className="hover:text-orange-400 transition">Home</a>
           <a href="#" className="hover:text-orange-400 transition">About</a>
           <a href="#" className="hover:text-orange-400 transition">Contact</a>
+
+          {/* USER ICON BUTTON */}
+          <FaUserCircle
+            size={38}
+            onClick={() => navigate("/login")}
+            className="cursor-pointer hover:text-orange-400 transition"
+          />
         </div>
       </nav>
 
@@ -23,7 +35,7 @@ const Home = () => {
       <div className="flex flex-col items-center justify-center flex-grow text-center px-4">
         
         <img
-          src="/logo.jpg"   // replace with your center logo image
+          src="/logo.jpg"
           alt="Battlix Logo"
           className="w-40 mb-5 drop-shadow-xl"
         />
@@ -37,10 +49,17 @@ const Home = () => {
         </p>
 
         <div className="flex gap-6">
-          <button className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition">
+          <button
+            onClick={() => navigate("/create-room")}
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition"
+          >
             Create Room
           </button>
-          <button className="bg-[#0f2735] hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition">
+
+          <button
+            onClick={() => navigate("/join-room")}
+            className="bg-[#0f2735] hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition"
+          >
             Join Room
           </button>
         </div>
@@ -50,6 +69,7 @@ const Home = () => {
       <footer className="w-full text-center py-4 bg-[#0f2735] text-white text-sm font-medium">
         © {new Date().getFullYear()} Battlix. All Rights Reserved.
       </footer>
+
     </div>
   );
 };
