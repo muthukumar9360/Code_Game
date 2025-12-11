@@ -5,6 +5,8 @@ import { FaUserCircle } from "react-icons/fa";
 const Home = () => {
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const user=localStorage.getItem("username");
   return (
     <div
       className="min-h-screen flex flex-col bg-center bg-no-repeat bg-cover"
@@ -32,20 +34,37 @@ const Home = () => {
 
             {menuOpen && (
               <div className="absolute right-0 mt-2 w-40 bg-white text-[#0f2735] rounded-xl shadow-lg overflow-hidden z-50">
-                <button
-                  onClick={() => navigate("/login")}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium"
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => navigate("/signup")}
-                  className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium"
-                >
-                  Sign Up
-                </button>
+
+                {!user ? (
+                  <>
+                    <button onClick={() => navigate("/login")} className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium">
+                      Login
+                    </button>
+                    <button onClick={() => navigate("/signup")} className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium">
+                      Sign Up
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <p className="px-4 py-3 font-semibold">{user}</p>
+                    <button
+                      onClick={() => {
+                        localStorage.removeItem("username");
+                        localStorage.removeItem("userId");
+                        localStorage.removeItem("email");
+                        localStorage.removeItem("token");
+                        navigate(0);
+                      }}
+                      className="w-full text-left px-4 py-3 hover:bg-gray-100 font-medium text-red-500"
+                    >
+                      Logout
+                    </button>
+                  </>
+                )}
+
               </div>
             )}
+
           </div>
         </div>
       </nav>
@@ -67,21 +86,24 @@ const Home = () => {
           Compete with coders around the world. Create rooms, join battles, and earn points and rank.
         </p>
 
-        <div className="flex gap-6">
-          <button
-            onClick={() => navigate("/create-room")}
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition"
-          >
-            Create Room
-          </button>
+        {user ? (
+          <div className="flex gap-6">
+            <button onClick={() => navigate("/create-room")}
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition">
+              Create Room
+            </button>
 
-          <button
-            onClick={() => navigate("/join-room")}
-            className="bg-[#0f2735] hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition"
-          >
-            Join Room
-          </button>
-        </div>
+            <button onClick={() => navigate("/join-room")}
+              className="bg-[#0f2735] hover:bg-gray-900 text-white font-bold py-3 px-8 rounded-xl text-lg shadow-lg transition">
+              Join Room
+            </button>
+          </div>
+        ) : (
+          <p className="text-gray-800 font-semibold text-lg mt-4">
+            Please <span className="text-orange-500 font-bold cursor-pointer" onClick={() => navigate("/login")}>login</span> to start playing.
+          </p>
+        )}
+
       </div>
 
       {/* FOOTER */}

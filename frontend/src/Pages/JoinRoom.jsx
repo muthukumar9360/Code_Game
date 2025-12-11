@@ -6,48 +6,79 @@ const JoinRoom = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center bg-center bg-cover"
-      style={{ backgroundImage: "url('/bg.png')" }}
+      className="min-h-screen w-full flex flex-col items-center justify-center 
+                 bg-[#0f2735] bg-opacity-80"
     >
-      <div className="bg-white w-[450px] p-10 rounded-2xl shadow-2xl bg-opacity-95">
+      {/* Animated Title */}
+      <h1 className="text-5xl font-extrabold text-white drop-shadow-xl mb-10 tracking-wide animate-pulse">
+        Join a <span className="text-orange-500">Battle Room</span>
+      </h1>
 
-        <h2 className="text-3xl font-extrabold text-center text-[#0f2735] mb-6 tracking-wide">
-          Join <span className="text-orange-500">Room</span>
+      {/* Glass Card */}
+      <div className="backdrop-blur-xl bg-white/20 border border-white/30 w-[450px] p-10 rounded-2xl shadow-2xl">
+
+        {/* Sub Heading */}
+        <h2 className="text-2xl font-bold text-center text-white mb-8">
+          Enter Details to Join
         </h2>
 
         <div className="flex flex-col gap-5">
 
+          {/* Username */}
           <div>
-            <label className="font-semibold text-gray-700">Enter Your Name</label>
+            <label className="font-semibold text-white tracking-wide">
+              Enter Your Name
+            </label>
             <input
               type="text"
-              placeholder="Your name"
-              className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-                         focus:ring-2 focus:ring-orange-400"
+              placeholder="Ex: Muthu"
+              className="w-full mt-2 px-4 py-3 rounded-xl bg-white/80 border border-gray-300
+                         outline-none focus:ring-4 focus:ring-orange-400 transition-all"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />
           </div>
 
+          {/* Room Code */}
           <div>
-            <label className="font-semibold text-gray-700">Room Code</label>
+            <label className="font-semibold text-white tracking-wide">
+              Room Code
+            </label>
             <input
               type="text"
-              placeholder="Enter room code"
-              className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-                         focus:ring-2 focus:ring-orange-400"
+              placeholder="Ex: 92AFKD"
+              className="w-full mt-2 px-4 py-3 rounded-xl bg-white/80 border border-gray-300
+                         outline-none focus:ring-4 focus:ring-orange-400 transition-all uppercase"
               value={roomCode}
               onChange={(e) => setRoomCode(e.target.value)}
             />
           </div>
 
+          {/* Join Room Button */}
           <button
-            className="bg-[#0f2735] hover:bg-gray-900 text-white font-bold py-3 rounded-xl transition shadow-lg"
+            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 
+                       rounded-xl text-lg transition shadow-lg hover:shadow-orange-500/50 
+                       hover:scale-105 active:scale-95"
           >
-            Join Room
+            ⚔️ Join Room
           </button>
         </div>
+
+        {/* Info Section */}
+        <div className="mt-8 text-white text-sm opacity-90">
+          <h3 className="font-bold text-lg mb-2">Before You Join</h3>
+          <ul className="list-disc ml-5 space-y-1">
+            <li>Check the room code given by your host</li>
+            <li>Make sure your internet connection is stable</li>
+            <li>Once joined, wait for host to start the contest</li>
+          </ul>
+        </div>
       </div>
+
+      {/* Footer */}
+      <p className="text-white mt-10 text-sm opacity-80">
+        Battlix – Compete. Learn. Win.
+      </p>
     </div>
   );
 };
