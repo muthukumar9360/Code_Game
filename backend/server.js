@@ -4,7 +4,7 @@ import connectDB from "./db.js";
 import express from "express";
 import cors from "cors";
 import userRoutes from "./routes/userRoutes.js";
-
+import problemRoutes from "./routes/problemRoutes.js";
 const app = express();
 
 app.use(express.json());
@@ -23,7 +23,7 @@ app.get("/api/health", (req, res) => {
 
 // User routes
 app.use("/api/users", userRoutes);
-
+app.use("/api/problems",problemRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
