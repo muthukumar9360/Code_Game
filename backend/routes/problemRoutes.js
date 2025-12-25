@@ -1,8 +1,13 @@
 import express from "express";
-import { createProblem } from "../controllers/problemController.js";
+import adminAuth from "../middleware/Adminauth.js";
+import { createProblem,getAllProblemsForAdmin, getAllProblemsForUser, getProblemBySlug } from "../controllers/problemController.js";
 
 const router = express.Router();
 
-router.post("/createProblem", createProblem);
+router.post("/createProblem", adminAuth, createProblem);
+router.get("/admin/allproblems", adminAuth, getAllProblemsForAdmin);
+
+router.get("/",getAllProblemsForUser);
+router.get("/:slug",getProblemBySlug);
 
 export default router;

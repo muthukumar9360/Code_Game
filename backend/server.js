@@ -5,6 +5,7 @@ import express from "express";
 import cors from "cors";
 import userRoutes from "./routes/userRoutes.js";
 import problemRoutes from "./routes/problemRoutes.js";
+import adminRoutes from "./routes/adminRoutes.js";
 const app = express();
 
 app.use(express.json());
@@ -24,6 +25,7 @@ app.get("/api/health", (req, res) => {
 // User routes
 app.use("/api/users", userRoutes);
 app.use("/api/problems",problemRoutes);
+app.use("/api/admin",adminRoutes);
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('❌ Error:', err.message);
