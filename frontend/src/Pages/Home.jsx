@@ -20,9 +20,10 @@ const Home = () => {
         </h1>
 
         <div className="flex gap-8 items-center text-white font-semibold text-lg">
-          <a href="#" className="hover:text-orange-400 transition">Home</a>
-          <a href="#" className="hover:text-orange-400 transition">About</a>
-          <a href="#" className="hover:text-orange-400 transition">Contact</a>
+          <button onClick={() => navigate("/")} className="hover:text-orange-400">Home</button>
+          <button onClick={() => navigate("/problems")} className="hover:text-orange-400">Problems</button>
+          <button onClick={() => navigate("/about")} className="hover:text-orange-400">About</button>
+
 
           {/* USER ICON BUTTON WITH DROPDOWN */}
           <div className="relative">
@@ -47,6 +48,9 @@ const Home = () => {
                 ) : (
                   <>
                     <p className="px-4 py-3 font-semibold">{user}</p>
+                    <button 
+                      onClick={()=>{navigate("/profile")}}
+                      className="w-full text-left px-4 py-3 font-semibold hover:bg-gray-100">Profile</button>
                     <button
                       onClick={() => {
                         localStorage.removeItem("username");

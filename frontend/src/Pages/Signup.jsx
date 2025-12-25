@@ -24,7 +24,7 @@ const Signup = () => {
     }
 
     try {
-      const response = await axios.post(`${API}/signup`, {
+      const response = await axios.post(`${API}/api/users/signup`, {
         fullname,
         username,
         email,
@@ -36,6 +36,7 @@ const Signup = () => {
       localStorage.setItem("userId", response.data.user.id);
       localStorage.setItem("email", response.data.user.email);
       localStorage.setItem("token", response.data.token);
+      localStorage.setItem("Role","user");
 
       navigate("/"); // go home
     } catch (error) {

@@ -9,9 +9,14 @@ import ContestPage from "./Pages/ContestPage.jsx";
 import ResultPage from "./Pages/ResultPage.jsx";
 import CreateRoom from "./Pages/CreateRoom.jsx";
 import JoinRoom from "./Pages/JoinRoom.jsx";
+import Profile from "./Pages/Profile.jsx";
+import Problems from "./Pages/Problems.jsx";
+import ProblemSolve from "./Pages/ProblemSolve.jsx";
 
 import AdminLogin from "./Admin/AdminLogin.jsx";
 import CreateProgram from "./Admin/createprogram.jsx";
+import AdminHome from "./Admin/AdminHome.jsx";
+import AdminProblems from "./Admin/AdminProblems.jsx";
 
 function App() {
   const [loading, setLoading] = useState(true);
@@ -30,9 +35,14 @@ function App() {
           <Route path="/room/:roomId" element={<RoomLobby />} />
           <Route path="/contest/:contestId" element={<ContestPage />} />
           <Route path="/results/:contestId" element={<ResultPage />} />
+          <Route path="/profile" element={<Profile />}/>
+          <Route path="/problems" element={<Problems />} />
+          <Route path="/problems/:slug" element={<ProblemSolve />} />
 
           <Route path="/Admin/login" element={<AdminLogin/>} />
           <Route path="/Admin/createprogram" element={<CreateProgram/>} />
+          <Route path="/Admin/home" element={<AdminHome/>} />
+          <Route path="/admin/problems" element={<AdminProblems />} />
 
         </Routes>
       )}

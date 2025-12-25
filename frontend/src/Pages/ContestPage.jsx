@@ -20,7 +20,7 @@ const ContestPage = () => {
   const TESTCASES = [
     { input: "hello", expected: "olleh" },
     { input: "world", expected: "dlrow" },
-    { input: "battlix", expected: "xiltab" }
+    { input: "battlix", expected: "xilttab" }
   ];
 
   // FUNCTION: Run code against testcases using FREE Judge0 CE (no key needed)

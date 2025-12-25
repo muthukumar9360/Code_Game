@@ -1,24 +1,52 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {FaEye,FaEyeSlash} from "react-icons/fa";
+import {jwtDecode} from "jwt-decode";
 
 const AdminLogin = () => {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const API=import.meta.env.VITE_API_URL;
+
   const navigate = useNavigate();
 
-  const handleAdminLogin = (e) => {
+  const handleAdminLogin = async (e) => {
     e.preventDefault();
 
-    if (username === "SMDF" && password === "SMDF") {
-      // Store admin session
-      localStorage.setItem("admin", "true");
+    try{
+      const res = await fetch("http://localhost:5000/api/admin/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-      alert("Admin Login SucceFssful!");
-      navigate("/Admin/createprogram"); 
-    } else {
-      alert("Invalid admin credentials!");
+      const data = await res.json();
+      if(!res.ok){
+        alert(data.message || "Admin Login Failed");
+        setLoading(false);
+        return;
+      }
+
+      localStorage.setItem("adminToken", data.token);
+      localStorage.setItem("adminUsername", username);
+      const decode=jwtDecode(data.token);
+      console.log(decode.role);
+      localStorage.setItem("Role", decode.role);
+
+      console.log(data.token);
+      alert("Admin Login Successful");
+      navigate("/Admin/home");
+    }
+    catch(err){
+      console.error("Admin Login Error:", err);
+      alert("An error occurred during admin login");
+    }
+    finally{
+      setLoading(false);
     }
   };
 

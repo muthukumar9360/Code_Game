@@ -28,6 +28,12 @@ const createprogram = () => {
     setForm({ ...form, [section]: updated });
   };
 
+  const handleSimpleArrayChange = (section, index, value) => {
+    const updated = [...form[section]];
+    updated[index] = value;
+    setForm({ ...form, [section]: updated });
+  };
+
   // Add new field (examples, constraints, topics, companies, testcases)
   const addField = (section, template) => {
     setForm({ ...form, [section]: [...form[section], template] });
@@ -40,8 +46,28 @@ const createprogram = () => {
 
   // Submit to backend
   const submitProblem = async () => {
+    if (
+      !form.slug.trim() ||
+      !form.title.trim() ||
+      !form.description.trim() ||
+      !form.difficulty ||
+      form.examples.some((e) => !e.input || !e.output || !e.explanation) ||
+      form.constraints.some((c) => !c) ||
+      form.topics.some((t) => !t) ||
+      form.companies.some((c) => !c) ||
+      form.testcases.some((tc) => !tc.input || !tc.output)
+    ) {
+      alert("Please fill all required fields before submitting");
+      return;
+    }
+
     try {
-      await axios.post(`${API}/problems`, form);
+      await axios.post(`${API}/api/problems/createProblem`, form, {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("adminToken")}`,
+          "Content-Type": "application/json",
+        },
+      });
       alert("Problem created successfully!");
     } catch (err) {
       console.error(err);
@@ -52,7 +78,6 @@ const createprogram = () => {
   return (
     <div className="min-h-screen bg-gray-50 p-8 flex justify-center">
       <div className="w-full max-w-4xl bg-white p-8 rounded-2xl shadow-lg space-y-8">
-
         <h1 className="text-4xl font-bold text-center text-[#0f2735]">
           Create Coding Problem
         </h1>
@@ -159,12 +184,7 @@ const createprogram = () => {
               value={c}
               placeholder="Constraint"
               onChange={(e) =>
-                handleNestedChange(
-                  "constraints",
-                  idx,
-                  null,
-                  (form.constraints[idx] = e.target.value)
-                )
+                handleSimpleArrayChange("constraints", idx, e.target.value)
               }
               className="w-full p-2 border rounded mb-2"
             />
@@ -188,12 +208,7 @@ const createprogram = () => {
               value={t}
               placeholder="Topic (array, dp, hashmap...)"
               onChange={(e) =>
-                handleNestedChange(
-                  "topics",
-                  idx,
-                  null,
-                  (form.topics[idx] = e.target.value)
-                )
+                handleSimpleArrayChange("topics", idx, e.target.value)
               }
               className="w-full p-2 border rounded mb-2"
             />
@@ -217,12 +232,7 @@ const createprogram = () => {
               value={c}
               placeholder="Company (Google, Amazon...)"
               onChange={(e) =>
-                handleNestedChange(
-                  "companies",
-                  idx,
-                  null,
-                  (form.companies[idx] = e.target.value)
-                )
+                handleSimpleArrayChange("companies", idx, e.target.value)
               }
               className="w-full p-2 border rounded mb-2"
             />

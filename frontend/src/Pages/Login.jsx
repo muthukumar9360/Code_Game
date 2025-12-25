@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import {jwtDecode} from "jwt-decode";
 
 const Login = () => {
   const [name, setName] = useState("");
@@ -15,13 +16,20 @@ const Login = () => {
     e.preventDefault();
     console.log(`${API}`);
     try {
-      const response = await axios.post(`${API}/login`, { name, password });
+      const response = await axios.post(`${API}/api/users/login`, { name, password });
       console.log("API callled");
       if (response.status === 201 || response.status === 200) {
         localStorage.setItem("username", response.data.user.username);
         localStorage.setItem("userId", response.data.user.id);
         localStorage.setItem("email", response.data.user.email);
         localStorage.setItem("token", response.data.token);
+
+        // const token=response.data.token;
+        // console.log("Token:",token);
+        // const decode = jwtDecode(token);
+        // console.log("Decoded Role:", decode.role);
+        localStorage.setItem("Role","user");
+
         navigate("/");
       } else {
         alert("Login failed. Please check your credentials.");
