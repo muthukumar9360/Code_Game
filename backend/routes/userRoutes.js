@@ -34,18 +34,27 @@ router.post('/signup', async (req, res) => {
       passwordHash: hashPassword(password)
     });
 
-    await newUser.save();
-    console.log('User created:', username);
+    try {
+      await newUser.save();
+      console.log('User created:', username);
 
-    res.status(201).json({
-      message: 'User created successfully',
-      user: {
-        id: newUser._id,
-        username: newUser.username,
-        email: newUser.email,
-        tier: newUser.tier
+      res.status(201).json({
+        message: 'User created successfully',
+        user: {
+          id: newUser._id,
+          username: newUser.username,
+          email: newUser.email,
+          tier: newUser.tier
+        }
+      });
+    } catch (saveError) {
+      if (saveError.code === 11000) {
+        // Duplicate key error
+        return res.status(400).json({ error: 'Username or email already exists' });
       }
-    });
+      console.error('Signup error:', saveError.message);
+      res.status(500).json({ error: saveError.message });
+    }
   } catch (error) {
     console.error('Signup error:', error.message);
     res.status(500).json({ error: error.message });
