@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaTerminal, FaShieldAlt, FaRocket, FaInfoCircle } from "react-icons/fa";
 
 const CreateRoom = () => {
   const [username, setUsername] = useState("");
@@ -10,26 +11,25 @@ const CreateRoom = () => {
   const navigate = useNavigate();
 
   const battleTypes = [
-    { value: "1vs1", label: "1 vs 1", description: "Classic head-to-head battle" },
-    { value: "2vs2", label: "2 vs 2", description: "Team battle with 2 players each" },
-    { value: "4vs4", label: "4 vs 4", description: "Large team battle with 4 players each" }
+    { value: "1vs1", label: "DUEL", description: "1 vs 1 / Head-to-Head" },
+    { value: "2vs2", label: "SQUAD", description: "2 vs 2 / Tactical Team" },
+    { value: "4vs4", label: "WARZONE", description: "4 vs 4 / Full Scale Battle" }
   ];
 
   const tiers = ["Bronze", "Silver", "Gold", "Platinum", "Diamond"];
 
   const handleCreateRoom = async () => {
     if (!username.trim()) {
-      setError("Please enter your name");
+      setError("Authorization Failed: Name Required");
       return;
     }
-
     setLoading(true);
     setError("");
 
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        setError("Please login first");
+        setError("System Error: No Session Token Found");
         setLoading(false);
         return;
       }
@@ -40,152 +40,142 @@ const CreateRoom = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          battleType,
-          tier,
-        }),
+        body: JSON.stringify({ battleType, tier }),
       });
 
       const data = await response.json();
-
       if (data.success) {
-        // Navigate to room lobby with room details
         navigate(`/room/${data.battle.roomId}`, {
-          state: {
-            battle: data.battle,
-            isHost: true,
-            username: username.trim()
-          }
+          state: { battle: data.battle, isHost: true, username: username.trim() }
         });
       } else {
-        setError(data.error || "Failed to create room");
+        setError(data.error || "Failed to initialize battle server");
       }
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError("Critical Error: Connection Interrupted");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen w-full flex flex-col items-center justify-center
-                 bg-[#0f2735] bg-opacity-80"
-    >
-      {/* Animated Title */}
-      <h1 className="text-5xl font-extrabold text-white drop-shadow-xl mb-10 tracking-wide animate-pulse">
-        Create Your <span className="text-orange-500">Battle Room</span>
-      </h1>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#050b10] text-white relative overflow-hidden font-sans">
+      
+      {/* GLOBAL BACKGROUND ACCENTS */}
+      <div className="absolute top-[-10%] right-[-10%] w-[500px] h-[500px] bg-orange-600/10 blur-[120px] rounded-full"></div>
+      <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 blur-[120px] rounded-full"></div>
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
 
-      {/* Glass Card */}
-      <div className="backdrop-blur-xl bg-white/20 border border-white/30 w-[500px] p-10 rounded-2xl shadow-2xl">
+      {/* HEADER SECTION */}
+      <div className="z-10 text-center mb-8">
+        <h1 className="text-5xl font-black tracking-tighter uppercase italic">
+          INITIALIZE <span className="text-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]">BATTLE</span>
+        </h1>
+        <p className="text-gray-500 tracking-[0.3em] text-xs mt-2 uppercase">Establish Secure Coding Environment</p>
+      </div>
 
-        <h2 className="text-2xl font-bold text-center text-white mb-8">
-          Host a Coding Contest
-        </h2>
+      {/* MAIN CONSOLE (CARD) */}
+      <div className="z-10 relative group">
+        {/* Glowing border effect */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-orange-500 to-blue-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+        
+        <div className="relative bg-[#0a1118]/90 backdrop-blur-2xl border border-white/10 w-[450px] md:w-[550px] p-8 rounded-2xl shadow-2xl">
+          
+          {error && (
+            <div className="bg-red-500/10 border-l-4 border-red-500 text-red-400 px-4 py-3 rounded mb-6 text-sm flex items-center gap-3">
+              <FaShieldAlt /> {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-2 rounded-lg mb-4">
-            {error}
+          <div className="space-y-6">
+            {/* USERNAME FIELD */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-orange-500 font-bold flex items-center gap-2 mb-2">
+                <FaTerminal /> Operator Alias
+              </label>
+              <input
+                type="text"
+                placeholder="INPUT NAME..."
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all font-mono"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            {/* BATTLE TYPE SELECTION */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-orange-500 font-bold mb-3 block">Engagement Mode</label>
+              <div className="grid grid-cols-1 gap-3">
+                {battleTypes.map((type) => (
+                  <button
+                    key={type.value}
+                    onClick={() => setBattleType(type.value)}
+                    className={`flex items-center justify-between p-4 rounded-xl border transition-all duration-300 ${
+                      battleType === type.value
+                        ? "bg-orange-500/10 border-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.2)]"
+                        : "bg-white/5 border-white/10 text-gray-400 hover:border-white/30"
+                    }`}
+                  >
+                    <div className="text-left">
+                      <div className="font-black italic tracking-tighter">{type.label}</div>
+                      <div className="text-[10px] uppercase opacity-60 tracking-wider">{type.description}</div>
+                    </div>
+                    {battleType === type.value && <div className="w-2 h-2 bg-orange-500 rounded-full animate-ping"></div>}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TIER SELECTION */}
+            <div>
+              <label className="text-[10px] uppercase tracking-widest text-orange-500 font-bold mb-2 block">System Difficulty</label>
+              <select
+                value={tier}
+                onChange={(e) => setTier(e.target.value)}
+                className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 outline-none focus:border-orange-500/50 transition-all text-sm appearance-none cursor-pointer"
+              >
+                {tiers.map((t) => (
+                  <option key={t} value={t} className="bg-[#0a1118] text-white">{t.toUpperCase()} LEVEL</option>
+                ))}
+              </select>
+            </div>
+
+            {/* ACTION BUTTON */}
+            <button
+              onClick={handleCreateRoom}
+              disabled={loading}
+              className="group relative w-full overflow-hidden bg-orange-500 py-4 rounded-lg font-black text-black tracking-widest uppercase hover:bg-orange-400 transition-all active:scale-95 disabled:opacity-50"
+            >
+              <div className="relative z-10 flex items-center justify-center gap-2">
+                {loading ? "ESTABLISHING..." : <><FaRocket className="text-sm" /> DEPLOY ROOM</>}
+              </div>
+              {/* Button light sweep effect */}
+              <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-500 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+            </button>
           </div>
-        )}
 
-        <div className="flex flex-col gap-5">
-
-          {/* Username Input */}
-          <div>
-            <label className="font-semibold text-white tracking-wide">
-              Enter Your Name
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Sathish"
-              className="w-full mt-2 px-4 py-3 rounded-xl bg-white/80 border border-gray-300
-                         outline-none focus:ring-4 focus:ring-orange-400 transition-all"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
-          </div>
-
-          {/* Battle Type Selection */}
-          <div>
-            <label className="font-semibold text-white tracking-wide">
-              Battle Type
-            </label>
-            <div className="mt-2 grid grid-cols-1 gap-2">
-              {battleTypes.map((type) => (
-                <label
-                  key={type.value}
-                  className={`flex items-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                    battleType === type.value
-                      ? "border-orange-500 bg-orange-500/20 text-white"
-                      : "border-white/30 bg-white/10 text-white hover:bg-white/20"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="battleType"
-                    value={type.value}
-                    checked={battleType === type.value}
-                    onChange={(e) => setBattleType(e.target.value)}
-                    className="mr-3"
-                  />
-                  <div>
-                    <div className="font-semibold">{type.label}</div>
-                    <div className="text-sm opacity-80">{type.description}</div>
-                  </div>
-                </label>
-              ))}
+          {/* QUICK INTEL SECTION */}
+          <div className="mt-8 pt-6 border-t border-white/5">
+            <div className="flex items-center gap-2 text-orange-500 mb-3">
+              <FaInfoCircle size={12}/>
+              <span className="text-[10px] font-black uppercase tracking-widest">Protocol Instructions</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-[9px] text-gray-500 uppercase tracking-tighter font-medium">
+                <div className="flex gap-2 items-start"><span className="text-orange-500">01</span><span>Host generates unique uplink ID</span></div>
+                <div className="flex gap-2 items-start"><span className="text-orange-500">02</span><span>Distribute ID to squad members</span></div>
+                <div className="flex gap-2 items-start"><span className="text-orange-500">03</span><span>Await connection of all operators</span></div>
+                <div className="flex gap-2 items-start"><span className="text-orange-500">04</span><span>Synchronize to start engagement</span></div>
             </div>
           </div>
-
-          {/* Tier Selection */}
-          <div>
-            <label className="font-semibold text-white tracking-wide">
-              Difficulty Tier
-            </label>
-            <select
-              value={tier}
-              onChange={(e) => setTier(e.target.value)}
-              className="w-full mt-2 px-4 py-3 rounded-xl bg-white/80 border border-gray-300
-                         outline-none focus:ring-4 focus:ring-orange-400 transition-all"
-            >
-              {tiers.map((tierOption) => (
-                <option key={tierOption} value={tierOption}>
-                  {tierOption}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          {/* Create Room Button */}
-          <button
-            onClick={handleCreateRoom}
-            disabled={loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-400
-                       text-white font-bold py-3 rounded-xl text-lg transition shadow-lg
-                       hover:shadow-orange-500/50 hover:scale-105 active:scale-95
-                       disabled:hover:scale-100 disabled:cursor-not-allowed"
-          >
-            {loading ? "Creating Room..." : "Create Room"}
-          </button>
-        </div>
-
-        {/* INFO SECTION */}
-        <div className="mt-8 text-white text-sm opacity-90">
-          <h3 className="font-bold text-lg mb-2">How It Works?</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>Enter your name to become the host</li>
-            <li>A unique room ID will be generated</li>
-            <li>Share the ID with your friends</li>
-            <li>Start the contest when everyone joins</li>
-          </ul>
         </div>
       </div>
 
-      <p className="text-white mt-10 text-sm opacity-80">
-        Battlix – Compete. Learn. Win.
-      </p>
+      {/* FOOTER ACCENT */}
+      <div className="mt-12 text-[10px] text-gray-600 uppercase tracking-[0.5em] flex items-center gap-4">
+        <span className="w-12 h-[1px] bg-gray-800"></span>
+        Battlix OS v2.0.4 // Ready to Serve
+        <span className="w-12 h-[1px] bg-gray-800"></span>
+      </div>
     </div>
   );
 };

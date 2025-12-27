@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { FaUserSecret, FaKey, FaShieldAlt, FaSatelliteDish, FaInfoCircle } from "react-icons/fa";
 
 const JoinRoom = () => {
   const [username, setUsername] = useState("");
@@ -10,12 +11,11 @@ const JoinRoom = () => {
 
   const handleJoinRoom = async () => {
     if (!username.trim()) {
-      setError("Please enter your name");
+      setError("Identification Required: Enter Alias");
       return;
     }
-
     if (!roomCode.trim()) {
-      setError("Please enter the room code");
+      setError("Uplink Error: Room Code Missing");
       return;
     }
 
@@ -25,7 +25,7 @@ const JoinRoom = () => {
     try {
       const token = localStorage.getItem("token");
       if (!token) {
-        setError("Please login first");
+        setError("Session Expired: Re-authentication Required");
         setLoading(false);
         return;
       }
@@ -41,7 +41,6 @@ const JoinRoom = () => {
       const data = await response.json();
 
       if (data.success) {
-        // Navigate to room lobby with room details
         navigate(`/room/${data.battle.roomId}`, {
           state: {
             battle: data.battle,
@@ -50,99 +49,120 @@ const JoinRoom = () => {
           }
         });
       } else {
-        setError(data.error || "Failed to join room");
+        setError(data.error || "Uplink Failed: Invalid Room Code");
       }
     } catch (err) {
-      setError("Network error. Please try again.");
+      setError("Critical Error: Transmission Interrupted");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div
-      className="min-h-screen w-full flex flex-col items-center justify-center
-                 bg-[#0f2735] bg-opacity-80"
-    >
-      {/* Animated Title */}
-      <h1 className="text-5xl font-extrabold text-white drop-shadow-xl mb-10 tracking-wide animate-pulse">
-        Join a <span className="text-orange-500">Battle Room</span>
-      </h1>
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#050b10] text-white relative overflow-hidden font-sans">
+      
+      {/* BACKGROUND TECH ACCENTS */}
+      <div className="absolute top-[-15%] left-[-10%] w-[500px] h-[500px] bg-blue-600/10 blur-[130px] rounded-full"></div>
+      <div className="absolute bottom-[-15%] right-[-10%] w-[500px] h-[500px] bg-orange-600/10 blur-[130px] rounded-full"></div>
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
 
-      {/* Glass Card */}
-      <div className="backdrop-blur-xl bg-white/20 border border-white/30 w-[450px] p-10 rounded-2xl shadow-2xl">
+      {/* HEADER */}
+      <div className="z-10 text-center mb-10">
+        <h1 className="text-5xl font-black tracking-tighter uppercase italic">
+          ENTER <span className="text-orange-500 drop-shadow-[0_0_15px_rgba(249,115,22,0.6)]">ARENA</span>
+        </h1>
+        <p className="text-gray-500 tracking-[0.4em] text-[10px] mt-2 uppercase">Establish Remote Uplink Connection</p>
+      </div>
 
-        {/* Sub Heading */}
-        <h2 className="text-2xl font-bold text-center text-white mb-8">
-          Enter Details to Join
-        </h2>
+      {/* JOIN CARD */}
+      <div className="z-10 relative group">
+        {/* Neon Border Glow */}
+        <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-orange-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-1000"></div>
+        
+        <div className="relative bg-[#0a1118]/90 backdrop-blur-3xl border border-white/10 w-[400px] md:w-[480px] p-10 rounded-2xl shadow-2xl">
+          
+          {error && (
+            <div className="bg-red-500/10 border-l-4 border-red-500 text-red-400 px-4 py-3 rounded-md mb-6 text-xs flex items-center gap-3 animate-shake">
+              <FaShieldAlt className="shrink-0" /> {error}
+            </div>
+          )}
 
-        {error && (
-          <div className="bg-red-500/20 border border-red-500 text-red-100 px-4 py-2 rounded-lg mb-4">
-            {error}
+          <div className="space-y-8">
+            {/* USERNAME INPUT */}
+            <div>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-orange-500 font-bold flex items-center gap-2 mb-3">
+                <FaUserSecret /> Combatant Identity
+              </label>
+              <input
+                type="text"
+                placeholder="INPUT ALIAS..."
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-4 text-white outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 transition-all font-mono tracking-widest"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+              />
+            </div>
+
+            {/* ROOM CODE INPUT */}
+            <div>
+              <label className="text-[10px] uppercase tracking-[0.2em] text-orange-500 font-bold flex items-center gap-2 mb-3">
+                <FaKey /> Access Keycode
+              </label>
+              <input
+                type="text"
+                placeholder="EX: BTX-77"
+                className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-4 text-white outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all font-mono text-xl tracking-[0.3em] uppercase placeholder:opacity-30"
+                value={roomCode}
+                onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              />
+            </div>
+
+            {/* ACTION BUTTON */}
+            <button
+              onClick={handleJoinRoom}
+              disabled={loading}
+              className="group relative w-full overflow-hidden bg-gradient-to-r from-orange-600 to-orange-500 py-4 rounded-lg font-black text-black tracking-widest uppercase transition-all active:scale-95 disabled:opacity-50"
+            >
+              <div className="relative z-10 flex items-center justify-center gap-3">
+                {loading ? "LINKING..." : (
+                  <>
+                    <FaSatelliteDish className="animate-pulse" />
+                    Connect to Room
+                  </>
+                )}
+              </div>
+              {/* Hover sweep effect */}
+              <div className="absolute inset-0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 bg-gradient-to-r from-transparent via-white/40 to-transparent"></div>
+            </button>
           </div>
-        )}
 
-        <div className="flex flex-col gap-5">
-
-          {/* Username */}
-          <div>
-            <label className="font-semibold text-white tracking-wide">
-              Enter Your Name
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: Muthu"
-              className="w-full mt-2 px-4 py-3 rounded-xl bg-white/80 border border-gray-300
-                         outline-none focus:ring-4 focus:ring-orange-400 transition-all"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-            />
+          {/* SYSTEM REQUIREMENTS */}
+          <div className="mt-10 pt-6 border-t border-white/5">
+            <div className="flex items-center gap-2 text-blue-400 mb-4">
+              <FaInfoCircle size={12}/>
+              <span className="text-[10px] font-black uppercase tracking-widest">Connection Protocol</span>
+            </div>
+            <ul className="space-y-2">
+              {[
+                "Verify access key with room host",
+                "Ensure low-latency network state",
+                "Ready compiler for deployment"
+              ].map((text, i) => (
+                <li key={i} className="flex items-center gap-3 text-[10px] text-gray-500 uppercase tracking-tight">
+                  <span className="w-1 h-1 bg-orange-500 rounded-full"></span>
+                  {text}
+                </li>
+              ))}
+            </ul>
           </div>
-
-          {/* Room Code */}
-          <div>
-            <label className="font-semibold text-white tracking-wide">
-              Room Code
-            </label>
-            <input
-              type="text"
-              placeholder="Ex: BTX392"
-              className="w-full mt-2 px-4 py-3 rounded-xl bg-white/80 border border-gray-300
-                         outline-none focus:ring-4 focus:ring-orange-400 transition-all uppercase"
-              value={roomCode}
-              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            />
-          </div>
-
-          {/* Join Room Button */}
-          <button
-            onClick={handleJoinRoom}
-            disabled={loading}
-            className="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-orange-400
-                       text-white font-bold py-3 rounded-xl text-lg transition shadow-lg
-                       hover:shadow-orange-500/50 hover:scale-105 active:scale-95
-                       disabled:hover:scale-100 disabled:cursor-not-allowed"
-          >
-            {loading ? "Joining Room..." : "⚔️ Join Room"}
-          </button>
-        </div>
-
-        {/* Info Section */}
-        <div className="mt-8 text-white text-sm opacity-90">
-          <h3 className="font-bold text-lg mb-2">Before You Join</h3>
-          <ul className="list-disc ml-5 space-y-1">
-            <li>Check the room code given by your host</li>
-            <li>Make sure your internet connection is stable</li>
-            <li>Once joined, wait for host to start the contest</li>
-          </ul>
         </div>
       </div>
 
-      {/* Footer */}
-      <p className="text-white mt-10 text-sm opacity-80">
-        Battlix – Compete. Learn. Win.
-      </p>
+      {/* FOOTER ACCENT */}
+      <footer className="mt-12 text-[10px] text-gray-700 uppercase tracking-[0.6em] flex items-center gap-4">
+        <span className="w-8 h-[1px] bg-gray-900"></span>
+        Secure_Uplink_Established
+        <span className="w-8 h-[1px] bg-gray-900"></span>
+      </footer>
     </div>
   );
 };
