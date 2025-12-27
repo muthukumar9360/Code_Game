@@ -8,7 +8,8 @@ import {
   createRoom,
   joinRoom,
   getRoomStatus,
-  startBattle
+  startBattle,
+  submitSolution
 } from '../controllers/battleController.js';
 
 const router = express.Router();
@@ -24,6 +25,9 @@ router.get('/room/:roomId', authMiddleware, getRoomStatus);
 
 // Start the battle (host only)
 router.post('/start/:battleId', authMiddleware, startBattle);
+
+// Submit solution during battle
+router.post('/:battleId/submit', authMiddleware, submitSolution);
 
 // Existing battle routes
 router.post('/create', authMiddleware, createBattle);

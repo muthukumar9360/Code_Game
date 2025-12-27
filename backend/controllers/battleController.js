@@ -1,8 +1,27 @@
+import mongoose from 'mongoose';
 import Battle from '../models/Battle.js';
 import User from '../models/User.js';
 import Problem from '../models/Problem.js';
+import Submission from '../models/Submission.js';
 import { findOpponent } from '../services/matchmakingService.js';
 import { startBattle as startBattleService, endBattle } from '../services/battleService.js';
+import { executeCode } from '../services/codeExecutionService.js';
+
+// Helper: accept either Mongo ObjectId or roomId string
+const resolveBattle = (idOrRoomId) => {
+  if (!idOrRoomId) return null;
+  if (mongoose.Types.ObjectId.isValid(idOrRoomId)) {
+    return Battle.findById(idOrRoomId);
+  }
+  return Battle.findOne({ roomId: idOrRoomId });
+};
+
+const participantUserId = (p) => {
+  if (!p || !p.user) return null;
+  if (typeof p.user === 'string') return p.user;
+  if (p.user._id) return p.user._id.toString();
+  return p.user.toString();
+};
 
 // Start the battle (host only)
 export const createBattle = async (req, res) => {
@@ -10,13 +29,13 @@ export const createBattle = async (req, res) => {
     const { battleId } = req.params;
     const userId = req.user.id;
 
-    let battle = await Battle.findById(battleId);
+    let battle = await resolveBattle(battleId);
     if (!battle) {
       return res.status(404).json({ error: 'Battle not found' });
     }
 
     // Check host
-    const isHost = battle.participants[0].user.toString() === userId;
+      const isHost = participantUserId(battle.participants[0]) === userId;
     if (!isHost) {
       return res.status(403).json({ error: 'Only host can start the battle' });
     }
@@ -81,7 +100,7 @@ export const joinBattle = async (req, res) => {
       return res.status(400).json({ error: 'Battle already started' });
     }
 
-    const isParticipant = battle.participants.some(p => p.user._id.toString() === userId);
+      const isParticipant = battle.participants.some(p => participantUserId(p) === userId);
     if (!isParticipant) {
       return res.status(403).json({ error: 'Not invited to this battle' });
     }
@@ -113,7 +132,7 @@ export const getBattleStatus = async (req, res) => {
     const { battleId } = req.params;
     const userId = req.user.id;
 
-    const battle = await Battle.findById(battleId)
+    const battle = await resolveBattle(battleId)
       .populate('participants.user', 'username tier')
       .populate('problem');
 
@@ -121,9 +140,24 @@ export const getBattleStatus = async (req, res) => {
       return res.status(404).json({ error: 'Battle not found' });
     }
 
-    const isParticipant = battle.participants.some(p => p.user._id.toString() === userId);
+      const isParticipant = battle.participants.some(p => participantUserId(p) === userId);
     if (!isParticipant) {
       return res.status(403).json({ error: 'Not a participant in this battle' });
+    }
+
+    const now = new Date();
+    const elapsed = battle.startTime ? Math.floor((now - battle.startTime) / 1000) : 0;
+
+    // Build problem payload: include visible testcases only
+    let problemPayload = null;
+    if (battle.problem) {
+      problemPayload = {
+        id: battle.problem._id,
+        title: battle.problem.title,
+        description: battle.problem.description,
+        examples: battle.problem.examples || [],
+        testcases: (battle.problem.testcases || []).filter(tc => !tc.hidden).map(tc => ({ input: tc.input, output: tc.output }))
+      };
     }
 
     res.json({
@@ -131,12 +165,19 @@ export const getBattleStatus = async (req, res) => {
       battle: {
         id: battle._id,
         status: battle.status,
-        participants: battle.participants.map(p => ({
-          user: p.user.username,
-          tier: p.user.tier,
-          status: p.status,
-          result: p.result
-        })),
+        problem: problemPayload,
+        participants: battle.participants.map(p => {
+          const base = (p.timeLeft !== null && p.timeLeft !== undefined) ? p.timeLeft : (battle.duration || 30) * 60;
+          const timeLeft = Math.max(0, base - elapsed);
+          return {
+            user: (p.user && p.user.username) ? p.user.username : participantUserId(p),
+            tier: (p.user && p.user.tier) ? p.user.tier : undefined,
+            status: p.status,
+            result: p.result,
+            bestScore: p.bestScore || 0,
+            timeLeft
+          };
+        }),
         startTime: battle.startTime,
         endTime: battle.endTime,
         duration: battle.duration
@@ -154,12 +195,12 @@ export const endBattleManually = async (req, res) => {
     const { battleId } = req.params;
     const userId = req.user.id;
 
-    const battle = await Battle.findById(battleId);
+    const battle = await resolveBattle(battleId);
     if (!battle) {
       return res.status(404).json({ error: 'Battle not found' });
     }
 
-    const isParticipant = battle.participants.some(p => p.user._id.toString() === userId);
+      const isParticipant = battle.participants.some(p => participantUserId(p) === userId);
     if (!isParticipant) {
       return res.status(403).json({ error: 'Not a participant in this battle' });
     }
@@ -351,19 +392,126 @@ export const getRoomStatus = async (req, res) => {
   }
 };
 
+// Submit solution during battle
+export const submitSolution = async (req, res) => {
+  try {
+    const { battleId } = req.params;
+    const { code, language } = req.body;
+    const userId = req.user.id;
+
+    const battle = await resolveBattle(battleId).populate('problem');
+    if (!battle) {
+      return res.status(404).json({ error: 'Battle not found' });
+    }
+
+    if (battle.status !== 'active') {
+      return res.status(400).json({ error: 'Battle is not active' });
+    }
+
+    const participant = battle.participants.find(p => participantUserId(p) === userId);
+    if (!participant) {
+      return res.status(403).json({ error: 'Not a participant in this battle' });
+    }
+
+    // allow multiple submissions during the battle; we'll track bestScore
+
+    // Execute code against test cases (ensure problem and testcases exist)
+    const rawTestcases = (battle.problem && Array.isArray(battle.problem.testcases)) ? battle.problem.testcases : [];
+    if (!rawTestcases.length) {
+      return res.status(400).json({ error: 'No testcases available for this problem' });
+    }
+
+    const testCases = rawTestcases.filter(tc => !tc.hidden).map(tc => ({
+      input: tc.input,
+      expectedOutput: tc.output
+    }));
+
+    if (!testCases.length) {
+      return res.status(400).json({ error: 'No visible testcases available for this problem' });
+    }
+
+    const executionResult = await executeCode(code, language, testCases);
+
+    // Create submission record (use model fields)
+    const submission = new Submission({
+      user: userId,
+      battle: battle._id,
+      code,
+      language,
+      results: executionResult.results,
+      overallResult: executionResult.overallResult
+    });
+    await submission.save();
+
+    // update participant last submission time
+    participant.submissionTime = new Date();
+
+    // Calculate passed tests for this submission
+    const passedCount = Array.isArray(executionResult.results) ? executionResult.results.filter(r => r.testcase && r.testcase.passed).length : 0;
+    const totalTests = Array.isArray(executionResult.results) ? executionResult.results.length : 0;
+
+    // If this submission is the user's best, store it
+    if (!participant.bestScore || passedCount > participant.bestScore) {
+      participant.bestScore = passedCount;
+      participant.bestSubmission = submission._id;
+    }
+
+    // If user passed all tests -> immediate win
+    if (passedCount === totalTests && totalTests > 0) {
+      participant.result = 'win';
+
+      for (const p of battle.participants) {
+        if (participantUserId(p) !== userId) {
+          p.result = 'lose';
+        }
+      }
+
+      battle.status = 'finished';
+      battle.endTime = new Date();
+      await battle.save();
+
+      const io = req.app.get('io');
+      io.to(battle.roomId).emit('battle-ended', { message: 'Battle ended due to correct submission', battleId: battle._id });
+
+      return res.json({
+        success: true,
+        message: 'Correct solution submitted! Battle ended.',
+        result: 'win'
+      });
+    }
+
+    // Save battle state with updated bestScore
+    await battle.save();
+
+    return res.json({
+      success: true,
+      message: 'Solution submitted.',
+      passedCount,
+      totalTests,
+      bestScore: participant.bestScore
+    });
+
+  } catch (error) {
+    console.error('Submit solution error:', error);
+    const payload = { error: error.message };
+    if (process.env.NODE_ENV !== 'production' && error && error.stack) payload.stack = error.stack;
+    res.status(500).json(payload);
+  }
+};
+
 // Start the battle (host only)
 export const startBattle = async (req, res) => {
   try {
     const { battleId } = req.params;
     const userId = req.user.id;
 
-    const battle = await Battle.findById(battleId);
+    const battle = await resolveBattle(battleId);
     if (!battle) {
       return res.status(404).json({ error: 'Battle not found' });
     }
 
     // Check if user is the host
-    const isHost = battle.participants[0].user._id.toString() === userId;
+      const isHost = participantUserId(battle.participants[0]) === userId;
     if (!isHost) {
       return res.status(403).json({ error: 'Only host can start the battle' });
     }
@@ -379,6 +527,22 @@ export const startBattle = async (req, res) => {
     }
 
     await startBattleService(battleId);
+
+    // Set a timer to end the battle after the duration
+    const durationMs = battle.duration * 60 * 1000; // Convert minutes to milliseconds
+    setTimeout(async () => {
+      try {
+        const currentBattle = await resolveBattle(battleId);
+        if (currentBattle && currentBattle.status === 'active') {
+          await endBattle(currentBattle._id);
+          // Emit to all participants via Socket.IO
+          const io = req.app.get('io');
+          io.to(currentBattle.roomId).emit('battle-ended', { message: 'Battle ended due to timeout' });
+        }
+      } catch (error) {
+        console.error('Error ending battle on timeout:', error);
+      }
+    }, durationMs);
 
     res.json({
       success: true,

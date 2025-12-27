@@ -22,6 +22,20 @@ const battleSchema = new Schema({
     result: {
       type: String,
       enum: ['win', 'lose', 'draw', 'timeout']
+    },
+    bestScore: {
+      type: Number,
+      default: 0
+    }
+    ,
+    timeLeft: {
+      type: Number, // seconds remaining for this participant
+      default: null
+    },
+    bestSubmission: {
+      type: Schema.Types.ObjectId,
+      ref: 'Submission',
+      default: null
     }
   }],
   problem: {
@@ -57,4 +71,4 @@ const battleSchema = new Schema({
   }
 }, { timestamps: true });
 
-export default mongoose.model("Battle", battleSchema);
+export default mongoose.model("Battle", battleSchema); 

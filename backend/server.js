@@ -16,7 +16,15 @@ app.use(cors());
 
 // Create HTTP server and Socket.IO instance
 const server = createServer(app);
-const io = new SocketIOServer(server);
+const io = new SocketIOServer(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST']
+  }
+});
+
+// make io available in request handlers via req.app.get('io')
+app.set('io', io);
 
 // Connect to MongoDB
 connectDB().catch((err) => console.error("MongoDB connection failed:", err.message));

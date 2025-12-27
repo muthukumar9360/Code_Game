@@ -1,28 +1,45 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { FaPlay, FaRegClock, FaTerminal, FaCheckCircle, FaTimesCircle, FaCode } from "react-icons/fa";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
+import { io } from "socket.io-client";
 
 const ContestPage = () => {
+  const { contestId } = useParams();
+  const navigate = useNavigate();
+
   const [code, setCode] = useState("");
   const [language, setLanguage] = useState("python");
   const [results, setResults] = useState([]);
   const [debugOutput, setDebugOutput] = useState("");
   const [loading, setLoading] = useState(false);
+  const location = useLocation();
+  const [battle, setBattle] = useState(location.state?.battle || null);
+  const socketRef = useRef(null);
+
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const languageIdMap = { c: 50, cpp: 54, java: 62, python: 71 };
 
-  const TESTCASES = [
-    { input: "hello", expected: "olleh" },
-    { input: "world", expected: "dlrow" },
-    { input: "battlix", expected: "xilttab" }
-  ];
+  const TESTCASES = [];
 
   const runTestcases = async () => {
     setLoading(true);
     setDebugOutput("> Initializing compiler...\n> Connecting to Judge0 CE...\n");
     let testcaseResults = [];
 
-    for (let tc of TESTCASES) {
+    if (!code || !code.trim()) {
+      setLoading(false);
+      setDebugOutput(prev => prev + "> Error: please enter code before running.\n");
+      alert('Please write some code before running the testcases.');
+      return;
+    }
+
+    // if we have visible testcases from battle.problem use them
+    const visible = (battle && battle.problem && Array.isArray(battle.problem.testcases) && battle.problem.testcases.length) ?
+      battle.problem.testcases : TESTCASES;
+
+    for (let tc of visible) {
       try {
         const response = await axios.post(
           "https://ce.judge0.com/submissions?base64_encoded=false&wait=true",
@@ -41,28 +58,110 @@ const ContestPage = () => {
 
         const result = response.data;
         let output = result.stdout ? result.stdout.trim() : "";
-        let passed = output === tc.expected;
+        let passed = output === tc.output;
 
         testcaseResults.push({
           input: tc.input,
-          expected: tc.expected,
+          expected: tc.output,
           output,
           passed,
         });
 
       } catch (err) {
+        console.error('Judge0 API error', err.response?.data || err.message || err);
+        const errOutput = err.response?.data?.stderr || err.response?.data || "Execution Error";
         testcaseResults.push({
           input: tc.input,
-          expected: tc.expected,
-          output: "Execution Error",
+          expected: tc.output,
+          output: errOutput,
           passed: false,
         });
+        setDebugOutput(prev => prev + `> Judge0 error for input(${tc.input}): ${JSON.stringify(err.response?.data || err.message)}\n`);
       }
     }
 
     setResults(testcaseResults);
     setDebugOutput((prev) => prev + "> Execution complete. Check logs below.\n");
     setLoading(false);
+  };
+
+  // helper to format seconds to MM:SS
+  const fmt = (s) => {
+    const mm = Math.floor(s / 60).toString().padStart(2, "0");
+    const ss = (s % 60).toString().padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
+
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    const fetchStatus = async () => {
+      try {
+        const res = await axios.get(`${API}/api/battles/${contestId}/status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data && res.data.battle) setBattle(res.data.battle);
+      } catch (err) {
+        console.error("Failed to get battle status", err);
+      }
+    };
+
+    fetchStatus();
+
+    socketRef.current = io(API.replace(/https?:\/\//, "http://"));
+
+    socketRef.current.on("connect", () => {
+      socketRef.current.emit("join-battle", contestId);
+    });
+
+    socketRef.current.on("battle-ended", (data) => {
+      fetchStatus().then(() => navigate(`/results/${contestId}`, { state: { battle } }));
+    });
+
+    socketRef.current.on("battle-updated", (data) => {
+      if (data && data.battleId === contestId) fetchStatus();
+    });
+
+    return () => {
+      if (socketRef.current) {
+        socketRef.current.emit("leave-battle", contestId);
+        socketRef.current.disconnect();
+      }
+    };
+  }, [contestId]);
+
+  // local countdown tick
+  useEffect(() => {
+    if (!battle) return;
+    const t = setInterval(() => {
+      setBattle(prev => {
+        if (!prev) return prev;
+        const copy = JSON.parse(JSON.stringify(prev));
+        copy.participants = copy.participants.map(p => ({ ...p, timeLeft: Math.max(0, (p.timeLeft || 0) - 1) }));
+        return copy;
+      });
+    }, 1000);
+    return () => clearInterval(t);
+  }, [battle]);
+
+  // submit solution to backend
+  const submitSolution = async () => {
+    if (!contestId) return;
+    setLoading(true);
+    const token = localStorage.getItem("token");
+    try {
+      const res = await axios.post(`${API}/api/battles/${contestId}/submit`, { code, language }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data) {
+        const st = await axios.get(`${API}/api/battles/${contestId}/status`, { headers: { Authorization: `Bearer ${token}` } });
+        if (st.data && st.data.battle) setBattle(st.data.battle);
+      }
+    } catch (err) {
+      console.error("Submit error", err);
+      alert(err.response?.data?.error || "Submit failed");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,7 +181,7 @@ const ContestPage = () => {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-orange-500 font-mono text-xl bg-orange-500/10 px-4 py-1 rounded-full border border-orange-500/20">
             <FaRegClock className="animate-pulse" />
-            <span>09:58</span>
+            <span>{battle && battle.participants ? fmt(Math.max(...battle.participants.map(p => p.timeLeft || 0))) : "--:--"}</span>
           </div>
           <button className="bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold px-4 py-2 rounded border border-red-500/30 transition">
             ABANDON MISSION
@@ -102,27 +201,19 @@ const ContestPage = () => {
           
           <div className="p-6 overflow-y-auto grow">
             <h2 className="text-2xl font-black mb-4">
-              REVERSE <span className="text-orange-500">STRING_UPLINK</span>
+              {battle?.problem?.title || "Problem"}
             </h2>
 
             <div className="space-y-4 text-gray-400 leading-relaxed text-sm">
-              <p>
-                A high-frequency transmission has been intercepted. You are required to reverse the data packet 
-                <b className="text-white ml-1">S</b> to decode the hidden coordinates.
-              </p>
-              <p className="border-l-2 border-orange-500 pl-4 italic">
-                Restriction: Native `.reverse()` protocols are jammed. Manual logic is required.
-              </p>
+              <p dangerouslySetInnerHTML={{ __html: battle?.problem?.description || "No problem loaded." }} />
 
               <div className="mt-8 space-y-4">
-                <div className="bg-black/40 p-4 rounded-lg border border-white/5">
-                  <h3 className="text-[10px] font-bold text-orange-500 uppercase mb-2">Input_Buffer</h3>
-                  <code className="text-white font-mono">"hello"</code>
-                </div>
-                <div className="bg-black/40 p-4 rounded-lg border border-white/5">
-                  <h3 className="text-[10px] font-bold text-green-500 uppercase mb-2">Expected_Output</h3>
-                  <code className="text-white font-mono">"olleh"</code>
-                </div>
+                {(battle?.problem?.examples || []).map((ex, i) => (
+                  <div key={i} className="bg-black/40 p-4 rounded-lg border border-white/5">
+                    <h3 className="text-[10px] font-bold text-orange-500 uppercase mb-2">Example</h3>
+                    <code className="text-white font-mono">Input: {ex.input} — Output: {ex.output}</code>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -140,6 +231,18 @@ const ContestPage = () => {
                 <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
               </div>
               
+              <div className="ml-4 flex items-center gap-3">
+                {battle && battle.participants && (
+                  <div className="flex items-center gap-3 text-sm">
+                    {battle.participants.map((p, i) => (
+                      <div key={i} className="text-gray-300">
+                        {p.user}: {fmt(p.timeLeft || ((battle.duration || 30) * 60))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <select
                 className="bg-black/40 border border-white/10 text-orange-500 text-[10px] font-bold uppercase rounded px-3 py-1 outline-none"
                 value={language}
@@ -159,16 +262,33 @@ const ContestPage = () => {
               onChange={(e) => setCode(e.target.value)}
             ></textarea>
 
-            <div className="p-4 bg-black/20 border-t border-white/5 flex justify-end">
-              <button
-                onClick={runTestcases}
-                disabled={loading}
-                className={`flex items-center gap-2 px-8 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all
-                  ${loading ? "bg-gray-800 text-gray-500" : "bg-orange-500 text-black hover:bg-orange-400 hover:scale-105 active:scale-95 shadow-[0_0_20px_rgba(249,115,22,0.3)]"}
-                `}
-              >
-                {loading ? "Compiling..." : <><FaPlay className="text-[10px]" /> Run Simulation</>}
-              </button>
+            <div className="p-4 bg-black/20 border-t border-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={runTestcases}
+                  disabled={loading}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all ${loading ? "bg-gray-800 text-gray-500" : "bg-orange-500 text-black hover:bg-orange-400"}`}
+                >
+                  {loading ? "Compiling..." : <><FaPlay className="text-[10px]" /> Run</>}
+                </button>
+
+                <button
+                  onClick={submitSolution}
+                  disabled={loading}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all ${loading ? "bg-gray-800 text-gray-500" : "bg-green-500 text-black hover:bg-green-400"}`}
+                >
+                  Submit
+                </button>
+              </div>
+
+              <div>
+                <button
+                  onClick={() => navigate(-1)}
+                  className="px-4 py-2 rounded bg-white/5 text-xs"
+                >
+                  Back
+                </button>
+              </div>
             </div>
           </div>
 
