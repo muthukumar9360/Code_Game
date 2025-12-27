@@ -4,81 +4,65 @@ import Problem from '../models/Problem.js';
 import { findOpponent } from '../services/matchmakingService.js';
 import { startBattle as startBattleService, endBattle } from '../services/battleService.js';
 
+// Start the battle (host only)
 export const createBattle = async (req, res) => {
   try {
+    const { battleId } = req.params;
     const userId = req.user.id;
-    const { tier } = req.body;
 
-    // Get user
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+    let battle = await Battle.findById(battleId);
+    if (!battle) {
+      return res.status(404).json({ error: 'Battle not found' });
     }
 
-    // Find opponent
-    const opponent = await findOpponent(userId, tier || user.tier);
-    if (!opponent) {
-      return res.status(200).json({
-        message: 'No opponent found. Try again later.',
-        waiting: true
-      });
+    // Check host
+    const isHost = battle.participants[0].user.toString() === userId;
+    if (!isHost) {
+      return res.status(403).json({ error: 'Only host can start the battle' });
     }
 
-    // Select random problem based on tier
-    const difficultyMap = {
-      'Bronze': ['easy'],
-      'Silver': ['easy', 'medium'],
-      'Gold': ['medium'],
-      'Platinum': ['medium', 'hard'],
-      'Diamond': ['hard']
-    };
-
-    const allowedDifficulties = difficultyMap[tier || user.tier];
-    const problem = await Problem.aggregate([
-      { $match: { difficulty: { $in: allowedDifficulties } } },
-      { $sample: { size: 1 } }
-    ]);
-
-    if (!problem.length) {
-      return res.status(500).json({ error: 'No suitable problem found' });
+    if (battle.status !== 'waiting') {
+      return res.status(400).json({ error: 'Battle already started' });
     }
 
-    // Create battle
-    const battle = new Battle({
-      participants: [
-        { user: userId },
-        { user: opponent._id }
-      ],
-      problem: problem[0]._id,
-      tier: tier || user.tier,
-      roomId: `battle_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-    });
+    const minParticipants = parseInt(battle.battleType.split('vs')[0]);
+    if (battle.participants.length < minParticipants) {
+      return res
+        .status(400)
+        .json({ error: `Need at least ${minParticipants} participants to start` });
+    }
 
-    await battle.save();
+    // ✅ Start via service
+    const startedBattle = await startBattleService(battleId);
 
-    // Start battle
-    await startBattle(battle._id);
+    // ✅ Populate for frontend
+    const populatedBattle = await Battle.findById(startedBattle._id)
+      .populate('participants.user', 'username')
+      .populate('problem');
 
-    res.status(201).json({
+    return res.json({
       success: true,
       battle: {
-        id: battle._id,
-        roomId: battle.roomId,
-        problem: problem[0],
-        participants: [
-          { user: user.username, tier: user.tier },
-          { user: opponent.username, tier: opponent.tier }
-        ],
-        startTime: battle.startTime,
-        duration: battle.duration
+        id: populatedBattle._id,
+        roomId: populatedBattle.roomId,
+        battleType: populatedBattle.battleType,
+        problem: populatedBattle.problem,
+        participants: populatedBattle.participants.map(p => ({
+          user: p.user.username,
+          status: p.status
+        })),
+        status: populatedBattle.status,
+        startTime: populatedBattle.startTime,
+        duration: populatedBattle.duration
       }
     });
 
   } catch (error) {
-    console.error('Create battle error:', error);
+    console.error('Start battle error:', error);
     res.status(500).json({ error: error.message });
   }
 };
+
 
 export const joinBattle = async (req, res) => {
   try {

@@ -4,18 +4,61 @@ import { useLocation, useNavigate } from "react-router-dom";
 const RoomLobby = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { battle, isHost, username } = location.state || {};
+  const { battle: initialBattle, isHost, username } = location.state || {};
 
+  const [battle, setBattle] = useState(initialBattle);
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  // ✅ Update players whenever battle changes
   useEffect(() => {
     if (battle?.participants) {
       setPlayers(battle.participants.map(p => p.user));
     }
   }, [battle]);
 
+  // ✅ Poll room status every 3s so members know when host starts
+  useEffect(() => {
+    if (!battle?.roomId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(
+          `http://localhost:5000/api/battles/room/${battle.roomId}`,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setBattle(data.battle);
+
+          // ✅ Auto-redirect when active
+          if (data.battle.status === "active") {
+            clearInterval(interval);
+            navigate(`/contest/${data.battle.roomId}`, {
+              state: {
+                battle: data.battle,
+                username,
+              },
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Polling error:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [battle?.roomId, navigate, username]);
+
+  // ✅ Host starts battle
   const handleStartBattle = async () => {
     if (!battle?.id) {
       setError("Battle data not available");
@@ -29,32 +72,37 @@ const RoomLobby = () => {
       const token = localStorage.getItem("token");
       if (!token) {
         setError("Please login first");
-        setLoading(false);
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/api/battles/start/${battle.id}`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const response = await fetch(
+        `http://localhost:5000/api/battles/start/${battle.id}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await response.json();
 
-      if (data.success) {
-        // Navigate to contest page
-        navigate(`/contest/${battle.roomId}`, {
+      if (data.success && data.battle) {
+        setBattle(data.battle);
+
+        // ✅ Redirect host immediately
+        navigate(`/contest/${data.battle.roomId}`, {
           state: {
             battle: data.battle,
-            username
-          }
+            username,
+          },
         });
       } else {
         setError(data.error || "Failed to start battle");
       }
     } catch (err) {
+      console.error(err);
       setError("Network error. Please try again.");
     } finally {
       setLoading(false);
@@ -75,7 +123,10 @@ const RoomLobby = () => {
 
         {/* ROOM CODE */}
         <p className="text-center text-lg font-semibold text-gray-700 mb-6">
-          Room Code: <span className="text-orange-600">{battle?.roomId || 'Loading...'}</span>
+          Room Code:{" "}
+          <span className="text-orange-600">
+            {battle?.roomId || "Loading..."}
+          </span>
         </p>
 
         {/* PLAYERS LIST */}
@@ -103,7 +154,7 @@ const RoomLobby = () => {
           </div>
         )}
 
-        {/* ADMIN BUTTON / WAITING MESSAGE */}
+        {/* HOST BUTTON / WAITING MESSAGE */}
         <div className="text-center">
           {isHost ? (
             <button
