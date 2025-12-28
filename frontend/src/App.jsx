@@ -23,9 +23,9 @@ function App() {
 
   return (
     <BrowserRouter>
-      {loading ? (
+      {/* {loading ? (
         <SplashScreen onFinish={() => setLoading(false)} />
-      ) : (
+      ) : ( */}
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
@@ -45,7 +45,7 @@ function App() {
           <Route path="/admin/problems" element={<AdminProblems />} />
 
         </Routes>
-      )}
+      {/* )} */}
     </BrowserRouter>
   );
 }

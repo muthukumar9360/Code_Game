@@ -1,20 +1,22 @@
-import React,{useState} from "react";
+import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
 
 const Signup = () => {
   const navigate = useNavigate();
-  const [fullname, setFullname] = React.useState("");
-  const [username, setUsername] = React.useState("");
-  const [email, setEmail] = React.useState("");
-  const [password, setPassword] = React.useState("");
-  const [confirmPassword, setConfirmPassword] = React.useState("");
+
+  const [fullname, setFullname] = useState("");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const API = import.meta.env.VITE_API_URL;
+
   const handleSignup = async (e) => {
     e.preventDefault();
 
@@ -31,14 +33,13 @@ const Signup = () => {
         password,
       });
 
-      // Store user data
       localStorage.setItem("username", response.data.user.username);
       localStorage.setItem("userId", response.data.user.id);
       localStorage.setItem("email", response.data.user.email);
       localStorage.setItem("token", response.data.token);
-      localStorage.setItem("Role","user");
+      localStorage.setItem("Role", "user");
 
-      navigate("/"); // go home
+      navigate("/");
     } catch (error) {
       console.error(error);
       alert("Signup failed");
@@ -46,10 +47,18 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-100">
-      <div className="flex w-[950px] h-[700px] shadow-2xl rounded-2xl overflow-hidden">
-        {/* Left Side - Image */}
-        <div className="w-1/2">
+    <div className="min-h-screen flex items-center justify-center bg-[#050b10] relative overflow-hidden text-white">
+
+      {/* BACKGROUND GLOWS */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-600/20 blur-[120px] rounded-full"></div>
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
+      <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
+
+      {/* MAIN CARD */}
+      <div className="relative z-10 flex w-[950px] h-[700px] rounded-3xl overflow-hidden border border-white/10 backdrop-blur-xl shadow-2xl">
+
+        {/* LEFT SIDE IMAGE */}
+        <div className="w-1/2 relative">
           <img
             src="/logo.jpg"
             alt="Battlix Banner"
@@ -57,108 +66,125 @@ const Signup = () => {
           />
         </div>
 
-        {/* Right Side - Signup Form */}
-        <div className="w-1/2 flex flex-col justify-center px-12">
-          <h2 className="text-3xl font-bold text-center text-gray-800 mb-8 tracking-wide">
-            Create Account
+        {/* RIGHT SIDE FORM */}
+        <div className="w-1/2 flex flex-col justify-center px-12 bg-[#050b10] mt-10">
+
+          <h2 className="text-4xl font-black text-center mb-8 tracking-tight">
+            CREATE
+            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
+              ACCOUNT
+            </span>
           </h2>
 
-          <form className="flex flex-col gap-6">
-            {/* Full Name */}
+          <form className="flex flex-col gap-5" onSubmit={handleSignup}>
+
+            {/* FULL NAME */}
             <div>
-              <label className="font-semibold text-gray-700">Full Name</label>
+              <label className="text-sm text-gray-400 font-semibold">
+                Full Name
+              </label>
               <input
                 type="text"
-                placeholder="Enter your full name"
                 value={fullname}
+                placeholder="Enter full name"
                 onChange={(e) => setFullname(e.target.value)}
-                className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-                           focus:ring-2 focus:ring-orange-400"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
+                focus:ring-2 focus:ring-orange-500 transition"
               />
             </div>
 
-            {/* Username */}
+            {/* USERNAME */}
             <div>
-              <label className="font-semibold text-gray-700">Username</label>
+              <label className="text-sm text-gray-400 font-semibold">
+                Username
+              </label>
               <input
                 type="text"
-                placeholder="Choose a username"
                 value={username}
+                placeholder="Choose username"
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-                           focus:ring-2 focus:ring-orange-400"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
+                focus:ring-2 focus:ring-orange-500 transition"
               />
             </div>
 
-            {/* Email */}
+            {/* EMAIL */}
             <div>
-              <label className="font-semibold text-gray-700">Email</label>
+              <label className="text-sm text-gray-400 font-semibold">
+                Email
+              </label>
               <input
                 type="email"
-                placeholder="Enter your email"
                 value={email}
+                placeholder="Enter email"
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-                           focus:ring-2 focus:ring-orange-400"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
+                focus:ring-2 focus:ring-orange-500 transition"
               />
             </div>
 
-            {/* Password */}
+            {/* PASSWORD */}
             <div className="relative">
-              <label className="font-semibold text-gray-700">Password</label>
+              <label className="text-sm text-gray-400 font-semibold">
+                Password
+              </label>
               <input
                 type={showPassword ? "text" : "password"}
-                placeholder="Enter password"
                 value={password}
+                placeholder="Enter password"
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-               focus:ring-2 focus:ring-orange-400 pr-12"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
+                focus:ring-2 focus:ring-orange-500 transition pr-12"
               />
 
               <span
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-[43px] text-gray-600 cursor-pointer text-xl"
+                className="absolute right-4 top-[44px] text-gray-400 cursor-pointer text-xl hover:text-orange-400 transition"
               >
                 {showPassword ? <FaEyeSlash /> : <FaEye />}
               </span>
             </div>
 
-            {/* Confirm Password */}
+            {/* CONFIRM PASSWORD */}
             <div className="relative">
-              <label className="font-semibold text-gray-700">
+              <label className="text-sm text-gray-400 font-semibold">
                 Confirm Password
               </label>
               <input
                 type={showConfirmPassword ? "text" : "password"}
-                placeholder="Re-enter password"
                 value={confirmPassword}
+                placeholder="Re-enter password"
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full mt-1 px-4 py-3 border rounded-xl outline-none
-               focus:ring-2 focus:ring-orange-400 pr-12"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
+                focus:ring-2 focus:ring-orange-500 transition pr-12"
               />
 
               <span
-                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-4 top-[43px] text-gray-600 cursor-pointer text-xl"
+                onClick={() =>
+                  setShowConfirmPassword(!showConfirmPassword)
+                }
+                className="absolute right-4 top-[44px] text-gray-400 cursor-pointer text-xl hover:text-orange-400 transition"
               >
                 {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
               </span>
             </div>
 
+            {/* SIGNUP BUTTON */}
             <button
               type="submit"
-              className="bg-orange-500 text-white hover:bg-orange-600 font-bold py-3 rounded-xl transition-all duration-300"
-              onClick={handleSignup}
+              className="mt-4 px-6 py-4 bg-orange-500 text-black font-bold rounded-full
+              hover:scale-105 active:scale-95 transition-all shadow-[0_0_20px_rgba(249,115,22,0.5)]"
             >
-              Sign Up
+              CREATE ACCOUNT
             </button>
           </form>
 
-          <p className="text-gray-600 text-sm mt-6 text-center">
+          {/* LOGIN LINK */}
+          <p className="text-gray-400 text-sm mt-8 text-center">
             Already have an account?{" "}
             <span
-              className="text-orange-500 font-bold cursor-pointer"
               onClick={() => navigate("/login")}
+              className="text-orange-400 font-bold cursor-pointer hover:underline"
             >
               Login
             </span>
