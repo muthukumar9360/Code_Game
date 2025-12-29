@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { FaPlay, FaRegClock, FaTerminal, FaCheckCircle, FaTimesCircle, FaCode } from "react-icons/fa";
+import {
+  FaPlay,
+  FaRegClock,
+  FaTerminal,
+  FaCheckCircle,
+  FaTimesCircle,
+  FaCode,
+} from "react-icons/fa";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
+import ResultPopup from "./ResultPopup.jsx";
 
 const ContestPage = () => {
   const { contestId } = useParams();
@@ -17,6 +25,10 @@ const ContestPage = () => {
   const [battle, setBattle] = useState(location.state?.battle || null);
   const socketRef = useRef(null);
 
+  const [showResultPopup, setShowResultPopup] = useState(false);
+  const [isWinner, setIsWinner] = useState(false);
+  const [winnerName, setWinnerName] = useState("");
+
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const languageIdMap = { c: 50, cpp: 54, java: 62, python: 71 };
@@ -25,19 +37,28 @@ const ContestPage = () => {
 
   const runTestcases = async () => {
     setLoading(true);
-    setDebugOutput("> Initializing compiler...\n> Connecting to Judge0 CE...\n");
+    setDebugOutput(
+      "> Initializing compiler...\n> Connecting to Judge0 CE...\n"
+    );
     let testcaseResults = [];
 
     if (!code || !code.trim()) {
       setLoading(false);
-      setDebugOutput(prev => prev + "> Error: please enter code before running.\n");
-      alert('Please write some code before running the testcases.');
+      setDebugOutput(
+        (prev) => prev + "> Error: please enter code before running.\n"
+      );
+      alert("Please write some code before running the testcases.");
       return;
     }
 
     // if we have visible testcases from battle.problem use them
-    const visible = (battle && battle.problem && Array.isArray(battle.problem.testcases) && battle.problem.testcases.length) ?
-      battle.problem.testcases : TESTCASES;
+    const visible =
+      battle &&
+      battle.problem &&
+      Array.isArray(battle.problem.testcases) &&
+      battle.problem.testcases.length
+        ? battle.problem.testcases
+        : TESTCASES;
 
     for (let tc of visible) {
       try {
@@ -51,7 +72,7 @@ const ContestPage = () => {
           {
             headers: {
               "Content-Type": "application/json",
-              "Accept": "application/json"
+              Accept: "application/json",
             },
           }
         );
@@ -66,28 +87,41 @@ const ContestPage = () => {
           output,
           passed,
         });
-
       } catch (err) {
-        console.error('Judge0 API error', err.response?.data || err.message || err);
-        const errOutput = err.response?.data?.stderr || err.response?.data || "Execution Error";
+        console.error(
+          "Judge0 API error",
+          err.response?.data || err.message || err
+        );
+        const errOutput =
+          err.response?.data?.stderr || err.response?.data || "Execution Error";
         testcaseResults.push({
           input: tc.input,
           expected: tc.output,
           output: errOutput,
           passed: false,
         });
-        setDebugOutput(prev => prev + `> Judge0 error for input(${tc.input}): ${JSON.stringify(err.response?.data || err.message)}\n`);
+        setDebugOutput(
+          (prev) =>
+            prev +
+            `> Judge0 error for input(${tc.input}): ${JSON.stringify(
+              err.response?.data || err.message
+            )}\n`
+        );
       }
     }
 
     setResults(testcaseResults);
-    setDebugOutput((prev) => prev + "> Execution complete. Check logs below.\n");
+    setDebugOutput(
+      (prev) => prev + "> Execution complete. Check logs below.\n"
+    );
     setLoading(false);
   };
 
   // helper to format seconds to MM:SS
   const fmt = (s) => {
-    const mm = Math.floor(s / 60).toString().padStart(2, "0");
+    const mm = Math.floor(s / 60)
+      .toString()
+      .padStart(2, "0");
     const ss = (s % 60).toString().padStart(2, "0");
     return `${mm}:${ss}`;
   };
@@ -97,7 +131,7 @@ const ContestPage = () => {
     const fetchStatus = async () => {
       try {
         const res = await axios.get(`${API}/api/battles/${contestId}/status`, {
-          headers: { Authorization: `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
         if (res.data && res.data.battle) setBattle(res.data.battle);
       } catch (err) {
@@ -113,9 +147,42 @@ const ContestPage = () => {
       socketRef.current.emit("join-battle", contestId);
     });
 
-    socketRef.current.on("battle-ended", (data) => {
-      fetchStatus().then(() => navigate(`/results/${contestId}`, { state: { battle } }));
-    });
+socketRef.current.on("battle-ended", async () => {
+  const token = localStorage.getItem("token");
+
+  const res = await axios.get(`${API}/api/battles/${contestId}/status`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (res.data?.battle) {
+    const battleData = res.data.battle;
+    setBattle(battleData);
+
+    const myUsername =
+      location.state?.username || localStorage.getItem("username");
+
+    const me = battleData.participants.find(
+      (p) => p.user === myUsername
+    );
+
+    const opponent = battleData.participants.find(
+      (p) => p.user !== myUsername
+    );
+
+    if (me?.result === "win") {
+      setIsWinner(true);
+      setWinnerName(me.user);
+    } else {
+      setIsWinner(false);
+      setWinnerName(opponent?.user || "Opponent");
+    }
+
+    // 🔥 SHOW POPUP FOR BOTH USERS
+    setShowResultPopup(true);
+  }
+});
+
+
 
     socketRef.current.on("battle-updated", (data) => {
       if (data && data.battleId === contestId) fetchStatus();
@@ -133,10 +200,13 @@ const ContestPage = () => {
   useEffect(() => {
     if (!battle) return;
     const t = setInterval(() => {
-      setBattle(prev => {
+      setBattle((prev) => {
         if (!prev) return prev;
         const copy = JSON.parse(JSON.stringify(prev));
-        copy.participants = copy.participants.map(p => ({ ...p, timeLeft: Math.max(0, (p.timeLeft || 0) - 1) }));
+        copy.participants = copy.participants.map((p) => ({
+          ...p,
+          timeLeft: Math.max(0, (p.timeLeft || 0) - 1),
+        }));
         return copy;
       });
     }, 1000);
@@ -147,15 +217,62 @@ const ContestPage = () => {
   const submitSolution = async () => {
     if (!contestId) return;
     setLoading(true);
+
     const token = localStorage.getItem("token");
+
     try {
-      const res = await axios.post(`${API}/api/battles/${contestId}/submit`, { code, language }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (res.data) {
-        const st = await axios.get(`${API}/api/battles/${contestId}/status`, { headers: { Authorization: `Bearer ${token}` } });
-        if (st.data && st.data.battle) setBattle(st.data.battle);
-      }
+      // 🔹 Submit code
+      const res = await axios.post(
+        `${API}/api/battles/${contestId}/submit`,
+        { code, language },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // 🔥 CHECK WIN CONDITION FROM BACKEND
+// Fetch updated battle status
+const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
+
+// if (st.data?.battle) {
+//   setBattle(st.data.battle);
+
+//   // 🔥 CHECK RESULT FROM PARTICIPANTS
+//   const me = st.data.battle.participants.find(
+//     (p) => p.user === location.state?.username
+//   );
+
+//   const opponent = st.data.battle.participants.find(
+//     (p) => p.user !== location.state?.username
+//   );
+
+//   if (me?.result === "win") {
+//     setIsWinner(true);
+//     setWinnerName(me.user);
+//   } else {
+//     setIsWinner(false);
+//     setWinnerName(opponent?.user || "Opponent");
+//   }
+
+//   setShowResultPopup(true);
+// }
+
+
+      // 🔹 If not immediate win → update battle status
+      // const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
+      //   headers: { Authorization: `Bearer ${token}` },
+      // });
+
+      // if (st.data?.battle) {
+      //   setBattle(st.data.battle);
+
+      //   // find opponent name
+      //   const opponent = st.data.battle.participants.find(
+      //     (p) => p.user !== location.state?.username
+      //   );
+
+      //   setWinnerName(opponent?.user || "Opponent");
+      // }
     } catch (err) {
       console.error("Submit error", err);
       alert(err.response?.data?.error || "Submit failed");
@@ -166,12 +283,14 @@ const ContestPage = () => {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#050b10] text-white font-sans">
-      
       {/* TOP HUD (Heads-Up Display) */}
       <nav className="w-full py-4 px-8 bg-[#0a1118] border-b border-white/10 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-black italic tracking-tighter">
-            BATT<span className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">LIX</span>
+            BATT
+            <span className="text-orange-500 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]">
+              LIX
+            </span>
           </h1>
           <span className="px-3 py-1 bg-white/5 border border-white/10 rounded text-[10px] uppercase tracking-widest text-gray-400">
             Sector: Alpha_Contest
@@ -181,7 +300,13 @@ const ContestPage = () => {
         <div className="flex items-center gap-6">
           <div className="flex items-center gap-2 text-orange-500 font-mono text-xl bg-orange-500/10 px-4 py-1 rounded-full border border-orange-500/20">
             <FaRegClock className="animate-pulse" />
-            <span>{battle && battle.participants ? fmt(Math.max(...battle.participants.map(p => p.timeLeft || 0))) : "--:--"}</span>
+            <span>
+              {battle && battle.participants
+                ? fmt(
+                    Math.max(...battle.participants.map((p) => p.timeLeft || 0))
+                  )
+                : "--:--"}
+            </span>
           </div>
           <button className="bg-red-500/10 hover:bg-red-500/20 text-red-500 text-xs font-bold px-4 py-2 rounded border border-red-500/30 transition">
             ABANDON MISSION
@@ -191,27 +316,39 @@ const ContestPage = () => {
 
       {/* MAIN INTERFACE */}
       <div className="flex flex-1 p-4 gap-4 overflow-hidden">
-
         {/* LEFT: MISSION INTEL (Problem Statement) */}
         <div className="w-1/3 bg-[#0a1118] border border-white/10 rounded-xl flex flex-col overflow-hidden">
           <div className="p-4 border-b border-white/5 bg-white/5 flex items-center gap-2">
             <FaTerminal className="text-orange-500 text-sm" />
-            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-300">Mission Objectives</h2>
+            <h2 className="text-xs font-bold uppercase tracking-widest text-gray-300">
+              Mission Objectives
+            </h2>
           </div>
-          
+
           <div className="p-6 overflow-y-auto grow">
             <h2 className="text-2xl font-black mb-4">
               {battle?.problem?.title || "Problem"}
             </h2>
 
             <div className="space-y-4 text-gray-400 leading-relaxed text-sm">
-              <p dangerouslySetInnerHTML={{ __html: battle?.problem?.description || "No problem loaded." }} />
+              <p
+                dangerouslySetInnerHTML={{
+                  __html: battle?.problem?.description || "No problem loaded.",
+                }}
+              />
 
               <div className="mt-8 space-y-4">
                 {(battle?.problem?.examples || []).map((ex, i) => (
-                  <div key={i} className="bg-black/40 p-4 rounded-lg border border-white/5">
-                    <h3 className="text-[10px] font-bold text-orange-500 uppercase mb-2">Example</h3>
-                    <code className="text-white font-mono">Input: {ex.input} — Output: {ex.output}</code>
+                  <div
+                    key={i}
+                    className="bg-black/40 p-4 rounded-lg border border-white/5"
+                  >
+                    <h3 className="text-[10px] font-bold text-orange-500 uppercase mb-2">
+                      Example
+                    </h3>
+                    <code className="text-white font-mono">
+                      Input: {ex.input} — Output: {ex.output}
+                    </code>
                   </div>
                 ))}
               </div>
@@ -221,7 +358,6 @@ const ContestPage = () => {
 
         {/* RIGHT: COMPILER & LOGS */}
         <div className="w-2/3 flex flex-col gap-4">
-          
           {/* EDITOR AREA */}
           <div className="flex-1 bg-[#0a1118] border border-white/10 rounded-xl flex flex-col overflow-hidden shadow-2xl">
             <div className="p-2 border-b border-white/5 bg-white/5 flex justify-between items-center">
@@ -230,13 +366,14 @@ const ContestPage = () => {
                 <div className="w-3 h-3 rounded-full bg-orange-500/20 border border-orange-500/50"></div>
                 <div className="w-3 h-3 rounded-full bg-green-500/20 border border-green-500/50"></div>
               </div>
-              
+
               <div className="ml-4 flex items-center gap-3">
                 {battle && battle.participants && (
                   <div className="flex items-center gap-3 text-sm">
                     {battle.participants.map((p, i) => (
                       <div key={i} className="text-gray-300">
-                        {p.user}: {fmt(p.timeLeft || ((battle.duration || 30) * 60))}
+                        {p.user}:{" "}
+                        {fmt(p.timeLeft || (battle.duration || 30) * 60)}
                       </div>
                     ))}
                   </div>
@@ -267,15 +404,29 @@ const ContestPage = () => {
                 <button
                   onClick={runTestcases}
                   disabled={loading}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all ${loading ? "bg-gray-800 text-gray-500" : "bg-orange-500 text-black hover:bg-orange-400"}`}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all ${
+                    loading
+                      ? "bg-gray-800 text-gray-500"
+                      : "bg-orange-500 text-black hover:bg-orange-400"
+                  }`}
                 >
-                  {loading ? "Compiling..." : <><FaPlay className="text-[10px]" /> Run</>}
+                  {loading ? (
+                    "Compiling..."
+                  ) : (
+                    <>
+                      <FaPlay className="text-[10px]" /> Run
+                    </>
+                  )}
                 </button>
 
                 <button
                   onClick={submitSolution}
                   disabled={loading}
-                  className={`flex items-center gap-2 px-6 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all ${loading ? "bg-gray-800 text-gray-500" : "bg-green-500 text-black hover:bg-green-400"}`}
+                  className={`flex items-center gap-2 px-6 py-3 rounded-lg font-black text-xs uppercase tracking-[0.2em] transition-all ${
+                    loading
+                      ? "bg-gray-800 text-gray-500"
+                      : "bg-green-500 text-black hover:bg-green-400"
+                  }`}
                 >
                   Submit
                 </button>
@@ -299,27 +450,48 @@ const ContestPage = () => {
               <div className="flex items-center gap-2 text-gray-500 mb-2 border-b border-white/5 pb-2">
                 <FaCode /> <span>SYSTEM_LOGS</span>
               </div>
-              <pre className="text-green-500 whitespace-pre-wrap">{debugOutput || "> System idle. Awaiting user input..."}</pre>
+              <pre className="text-green-500 whitespace-pre-wrap">
+                {debugOutput || "> System idle. Awaiting user input..."}
+              </pre>
             </div>
 
             {/* TESTCASE STATUS */}
             <div className="w-1/2 bg-[#0a1118] border border-white/10 rounded-xl p-4 overflow-y-auto">
-              <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">Validation_Status</div>
+              <div className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-4">
+                Validation_Status
+              </div>
               <div className="space-y-2">
                 {results.length === 0 && (
-                  <div className="text-gray-600 text-[10px] italic">No simulation data available.</div>
+                  <div className="text-gray-600 text-[10px] italic">
+                    No simulation data available.
+                  </div>
                 )}
                 {results.map((r, i) => (
-                  <div key={i} className={`p-3 rounded-lg border flex items-center justify-between ${
-                    r.passed ? "bg-green-500/5 border-green-500/20" : "bg-red-500/5 border-red-500/20"
-                  }`}>
+                  <div
+                    key={i}
+                    className={`p-3 rounded-lg border flex items-center justify-between ${
+                      r.passed
+                        ? "bg-green-500/5 border-green-500/20"
+                        : "bg-red-500/5 border-red-500/20"
+                    }`}
+                  >
                     <div className="flex items-center gap-3">
-                      {r.passed ? <FaCheckCircle className="text-green-500" /> : <FaTimesCircle className="text-red-500" />}
-                      <span className="text-[10px] font-bold">NODE_{i + 1}</span>
+                      {r.passed ? (
+                        <FaCheckCircle className="text-green-500" />
+                      ) : (
+                        <FaTimesCircle className="text-red-500" />
+                      )}
+                      <span className="text-[10px] font-bold">
+                        NODE_{i + 1}
+                      </span>
                     </div>
-                    <span className={`text-[9px] px-2 py-0.5 rounded uppercase font-bold ${
-                       r.passed ? "bg-green-500 text-black" : "bg-red-500 text-white"
-                    }`}>
+                    <span
+                      className={`text-[9px] px-2 py-0.5 rounded uppercase font-bold ${
+                        r.passed
+                          ? "bg-green-500 text-black"
+                          : "bg-red-500 text-white"
+                      }`}
+                    >
                       {r.passed ? "Success" : "Failed"}
                     </span>
                   </div>
@@ -329,6 +501,16 @@ const ContestPage = () => {
           </div>
         </div>
       </div>
+      {showResultPopup && (
+        <ResultPopup
+          isWinner={isWinner}
+          winnerName={winnerName}
+          onClose={() => {
+            setShowResultPopup(false);
+            navigate(`/results/${contestId}`);
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -6,7 +6,7 @@ import Login from "./Pages/Login.jsx";
 import Signup from "./Pages/Signup.jsx";
 import RoomLobby from "./Pages/RoomLobby.jsx";
 import ContestPage from "./Pages/ContestPage.jsx";
-import ResultPage from "./Pages/ResultPage.jsx";
+import ResultPage from "./Pages/ResultPopup.jsx";
 import CreateRoom from "./Pages/CreateRoom.jsx";
 import JoinRoom from "./Pages/JoinRoom.jsx";
 import Profile from "./Pages/Profile.jsx";
