@@ -29,6 +29,8 @@ const ContestPage = () => {
   const [isWinner, setIsWinner] = useState(false);
   const [winnerName, setWinnerName] = useState("");
 
+  const popupShownRef = useRef(false);
+
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const languageIdMap = { c: 50, cpp: 54, java: 62, python: 71 };
@@ -51,7 +53,6 @@ const ContestPage = () => {
       return;
     }
 
-    // if we have visible testcases from battle.problem use them
     const visible =
       battle &&
       battle.problem &&
@@ -117,7 +118,6 @@ const ContestPage = () => {
     setLoading(false);
   };
 
-  // helper to format seconds to MM:SS
   const fmt = (s) => {
     const mm = Math.floor(s / 60)
       .toString()
@@ -144,45 +144,32 @@ const ContestPage = () => {
     socketRef.current = io(API.replace(/https?:\/\//, "http://"));
 
     socketRef.current.on("connect", () => {
+      console.log("Socket connected");
       socketRef.current.emit("join-battle", contestId);
     });
 
-socketRef.current.on("battle-ended", async () => {
-  const token = localStorage.getItem("token");
+    // ✅ FIXED: Handle battle-ended event for BOTH winner and loser
+    socketRef.current.on("battle-ended", ({ winner }) => {
+      console.log("Battle ended event received. Winner:", winner);
+      
+      const myUsername = location.state?.username || localStorage.getItem("username");
+      
+      console.log("My username:", myUsername);
+      console.log("Popup already shown?", popupShownRef.current);
 
-  const res = await axios.get(`${API}/api/battles/${contestId}/status`, {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-
-  if (res.data?.battle) {
-    const battleData = res.data.battle;
-    setBattle(battleData);
-
-    const myUsername =
-      location.state?.username || localStorage.getItem("username");
-
-    const me = battleData.participants.find(
-      (p) => p.user === myUsername
-    );
-
-    const opponent = battleData.participants.find(
-      (p) => p.user !== myUsername
-    );
-
-    if (me?.result === "win") {
-      setIsWinner(true);
-      setWinnerName(me.user);
-    } else {
-      setIsWinner(false);
-      setWinnerName(opponent?.user || "Opponent");
-    }
-
-    // 🔥 SHOW POPUP FOR BOTH USERS
-    setShowResultPopup(true);
-  }
-});
-
-
+      if (!popupShownRef.current) {
+        popupShownRef.current = true;
+        
+        // Determine if current user is the winner
+        const amIWinner = winner === myUsername;
+        
+        console.log("Am I winner?", amIWinner);
+        
+        setIsWinner(amIWinner);
+        setWinnerName(winner);
+        setShowResultPopup(true);
+      }
+    });
 
     socketRef.current.on("battle-updated", (data) => {
       if (data && data.battleId === contestId) fetchStatus();
@@ -194,9 +181,8 @@ socketRef.current.on("battle-ended", async () => {
         socketRef.current.disconnect();
       }
     };
-  }, [contestId]);
+  }, [contestId, location.state?.username]);
 
-  // local countdown tick
   useEffect(() => {
     if (!battle) return;
     const t = setInterval(() => {
@@ -213,7 +199,7 @@ socketRef.current.on("battle-ended", async () => {
     return () => clearInterval(t);
   }, [battle]);
 
-  // submit solution to backend
+  // ✅ FIXED: Submit solution handler
   const submitSolution = async () => {
     if (!contestId) return;
     setLoading(true);
@@ -221,58 +207,34 @@ socketRef.current.on("battle-ended", async () => {
     const token = localStorage.getItem("token");
 
     try {
-      // 🔹 Submit code
       const res = await axios.post(
         `${API}/api/battles/${contestId}/submit`,
         { code, language },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      // 🔥 CHECK WIN CONDITION FROM BACKEND
-// Fetch updated battle status
-const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
-  headers: { Authorization: `Bearer ${token}` },
-});
+      console.log("Submit response:", res.data);
 
-// if (st.data?.battle) {
-//   setBattle(st.data.battle);
+      // ✅ If I won, show popup immediately (before socket event)
+      if (!popupShownRef.current && res.data?.result === "win") {
+        popupShownRef.current = true;
+        
+        const myUsername = location.state?.username || localStorage.getItem("username");
+        
+        setIsWinner(true);
+        setWinnerName(myUsername);
+        setShowResultPopup(true);
+      }
 
-//   // 🔥 CHECK RESULT FROM PARTICIPANTS
-//   const me = st.data.battle.participants.find(
-//     (p) => p.user === location.state?.username
-//   );
+      // Fetch updated battle status
+      const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-//   const opponent = st.data.battle.participants.find(
-//     (p) => p.user !== location.state?.username
-//   );
+      if (st.data?.battle) {
+        setBattle(st.data.battle);
+      }
 
-//   if (me?.result === "win") {
-//     setIsWinner(true);
-//     setWinnerName(me.user);
-//   } else {
-//     setIsWinner(false);
-//     setWinnerName(opponent?.user || "Opponent");
-//   }
-
-//   setShowResultPopup(true);
-// }
-
-
-      // 🔹 If not immediate win → update battle status
-      // const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
-      //   headers: { Authorization: `Bearer ${token}` },
-      // });
-
-      // if (st.data?.battle) {
-      //   setBattle(st.data.battle);
-
-      //   // find opponent name
-      //   const opponent = st.data.battle.participants.find(
-      //     (p) => p.user !== location.state?.username
-      //   );
-
-      //   setWinnerName(opponent?.user || "Opponent");
-      // }
     } catch (err) {
       console.error("Submit error", err);
       alert(err.response?.data?.error || "Submit failed");
@@ -283,7 +245,7 @@ const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
 
   return (
     <div className="min-h-screen flex flex-col bg-[#050b10] text-white font-sans">
-      {/* TOP HUD (Heads-Up Display) */}
+      {/* TOP HUD */}
       <nav className="w-full py-4 px-8 bg-[#0a1118] border-b border-white/10 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-4">
           <h1 className="text-2xl font-black italic tracking-tighter">
@@ -316,7 +278,7 @@ const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
 
       {/* MAIN INTERFACE */}
       <div className="flex flex-1 p-4 gap-4 overflow-hidden">
-        {/* LEFT: MISSION INTEL (Problem Statement) */}
+        {/* LEFT: MISSION INTEL */}
         <div className="w-1/3 bg-[#0a1118] border border-white/10 rounded-xl flex flex-col overflow-hidden">
           <div className="p-4 border-b border-white/5 bg-white/5 flex items-center gap-2">
             <FaTerminal className="text-orange-500 text-sm" />
@@ -501,6 +463,8 @@ const st = await axios.get(`${API}/api/battles/${contestId}/status`, {
           </div>
         </div>
       </div>
+
+      {/* ✅ Result Popup */}
       {showResultPopup && (
         <ResultPopup
           isWinner={isWinner}

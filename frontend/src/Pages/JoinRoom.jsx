@@ -3,17 +3,17 @@ import { useNavigate } from "react-router-dom";
 import { FaUserSecret, FaKey, FaShieldAlt, FaSatelliteDish, FaInfoCircle } from "react-icons/fa";
 
 const JoinRoom = () => {
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(localStorage.getItem("username"));
   const [roomCode, setRoomCode] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
   const handleJoinRoom = async () => {
-    if (!username.trim()) {
-      setError("Identification Required: Enter Alias");
-      return;
-    }
+    // if (!username.trim()) {
+    //   setError("Identification Required: Enter Alias");
+    //   return;
+    // }
     if (!roomCode.trim()) {
       setError("Uplink Error: Room Code Missing");
       return;
@@ -98,7 +98,8 @@ const JoinRoom = () => {
                 placeholder="INPUT ALIAS..."
                 className="w-full bg-black/50 border border-white/10 rounded-lg px-4 py-4 text-white outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/30 transition-all font-mono tracking-widest"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                readOnly
+                // onChange={(e) => setUsername(e.target.value)}
               />
             </div>
 

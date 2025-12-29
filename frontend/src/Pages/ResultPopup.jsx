@@ -1,6 +1,9 @@
 import React from "react";
+import {FaTimes} from "react-icons/fa";
+import { useNavigate } from "react-router-dom";
 
 const ResultPopup = ({ isWinner, winnerName, onClose }) => {
+  const navigate = useNavigate();
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70">
       <div className="bg-white w-[550px] p-8 rounded-2xl shadow-2xl text-center animate-scaleIn">
@@ -9,6 +12,16 @@ const ResultPopup = ({ isWinner, winnerName, onClose }) => {
         <h2 className="text-3xl font-extrabold text-[#0f2735] mb-4">
           Contest Result
         </h2>
+        {/* CLOSE BUTTON */}
+<button
+  onClick={() => navigate("/")}
+  className="absolute top-4 right-4 text-white-400 hover:text-orange-500 text-2xl transition"
+  title="Go to Home"
+>
+  <FaTimes />
+</button>
+
+
 
         {/* RESULT MESSAGE */}
         {isWinner ? (

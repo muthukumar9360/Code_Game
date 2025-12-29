@@ -471,13 +471,27 @@ export const submitSolution = async (req, res) => {
       await battle.save();
 
       const io = req.app.get('io');
-      io.to(battle.roomId).emit('battle-ended', { message: 'Battle ended due to correct submission', battleId: battle._id });
+      // 🔥 Find winner username
 
-      return res.json({
-        success: true,
-        message: 'Correct solution submitted! Battle ended.',
-        result: 'win'
-      });
+      await battle.populate('participants.user', 'username');
+const winner = battle.participants.find(
+  (p) => p.result === 'win'
+);
+
+io.to(battle.roomId).emit('battle-ended', {
+  battleId: battle._id,
+  winner: winner?.user?.username || null
+});
+
+
+return res.json({
+  success: true,
+  status: 'finished',
+  result: 'win',                  // 🔥 IMPORTANT
+  winner: winner?.user?.username || null,
+  battleId: battle._id
+});
+
     }
 
     // Save battle state with updated bestScore
@@ -511,7 +525,8 @@ export const startBattle = async (req, res) => {
     }
 
     // Check if user is the host
-      const isHost = participantUserId(battle.participants[0]) === userId;
+      const isHost =
+       participantUserId(battle.participants[0]) === userId;
     if (!isHost) {
       return res.status(403).json({ error: 'Only host can start the battle' });
     }

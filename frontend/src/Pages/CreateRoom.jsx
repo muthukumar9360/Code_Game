@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaTerminal, FaShieldAlt, FaRocket, FaInfoCircle } from "react-icons/fa";
 
 const CreateRoom = () => {
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(localStorage.getItem("username"));
   const [battleType, setBattleType] = useState("1vs1");
   const [tier, setTier] = useState("Bronze");
   const [loading, setLoading] = useState(false);
@@ -19,10 +19,10 @@ const CreateRoom = () => {
   const tiers = ["Bronze", "Silver", "Gold", "Platinum", "Diamond"];
 
   const handleCreateRoom = async () => {
-    if (!username.trim()) {
-      setError("Authorization Failed: Name Required");
-      return;
-    }
+    // if (!username.trim()) {
+    //   setError("Authorization Failed: Name Required");
+    //   return;
+    // }
     setLoading(true);
     setError("");
 
@@ -98,7 +98,8 @@ const CreateRoom = () => {
                 placeholder="INPUT NAME..."
                 className="w-full bg-black/40 border border-white/10 rounded-lg px-4 py-3 text-white outline-none focus:border-orange-500/50 focus:ring-1 focus:ring-orange-500/50 transition-all font-mono"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                readOnly
+                // onChange={(e) => setUsername(e.target.value)}
               />
             </div>
 
