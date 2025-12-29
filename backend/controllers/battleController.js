@@ -569,3 +569,54 @@ export const startBattle = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+
+//Get user contest history
+export const getMyContestHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    const battles = await Battle.find({
+      "participants.user": userId
+    })
+      .populate("problem", "title difficulty")
+      .populate("participants.user", "username")
+      .sort({ createdAt: -1 });
+
+    const history = battles.map(battle => {
+      const me = battle.participants.find(
+        p => p.user._id.toString() === userId
+      );
+
+      const opponents = battle.participants
+        .filter(p => p.user._id.toString() !== userId)
+        .map(p => p.user.username);
+
+      return {
+        battleId: battle._id,
+        roomId: battle.roomId,
+        battleType: battle.battleType,
+        tier: battle.tier,
+        problemTitle: battle.problem?.title,
+        difficulty: battle.problem?.difficulty,
+        status: battle.status,
+        result: me?.result || "pending",
+        bestScore: me?.bestScore || 0,
+        opponents,
+        startTime: battle.startTime,
+        endTime: battle.endTime,
+        duration: battle.duration,
+        createdAt: battle.createdAt
+      };
+    });
+
+    res.json({
+      success: true,
+      totalBattles: history.length,
+      history
+    });
+  } catch (error) {
+    console.error("Contest history error:", error);
+    res.status(500).json({ error: error.message });
+  }
+};

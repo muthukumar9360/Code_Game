@@ -9,7 +9,8 @@ import {
   joinRoom,
   getRoomStatus,
   startBattle,
-  submitSolution
+  submitSolution,
+  getMyContestHistory
 } from '../controllers/battleController.js';
 
 const router = express.Router();
@@ -34,4 +35,5 @@ router.post('/create', authMiddleware, createBattle);
 router.get('/:battleId/status', authMiddleware, getBattleStatus);
 router.post('/:battleId/end', authMiddleware, endBattleManually);
 
+router.get('/my-history', authMiddleware, getMyContestHistory);
 export default router;
