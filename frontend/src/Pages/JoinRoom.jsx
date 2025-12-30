@@ -9,6 +9,7 @@ const JoinRoom = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const API = import.meta.env.VITE_API_URL;
   const handleJoinRoom = async () => {
     // if (!username.trim()) {
     //   setError("Identification Required: Enter Alias");
@@ -30,7 +31,7 @@ const JoinRoom = () => {
         return;
       }
 
-      const response = await fetch(`http://localhost:5000/api/battles/join-room/${roomCode.trim().toUpperCase()}`, {
+      const response = await fetch(`${API}/api/battles/join-room/${roomCode.trim().toUpperCase()}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

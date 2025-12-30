@@ -10,6 +10,7 @@ const CreateRoom = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  const API = import.meta.env.VITE_API_URL;
   const battleTypes = [
     { value: "1vs1", label: "DUEL", description: "1 vs 1 / Head-to-Head" },
     { value: "2vs2", label: "SQUAD", description: "2 vs 2 / Tactical Team" },
@@ -34,7 +35,7 @@ const CreateRoom = () => {
         return;
       }
 
-      const response = await fetch("http://localhost:5000/api/battles/create-room", {
+      const response = await fetch(`${API}/api/battles/create-room`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

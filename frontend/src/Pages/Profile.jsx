@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 const Profile = () => {
   const navigate = useNavigate();
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_URL;
 
   const [user, setUser] = useState(null);
   const [history, setHistory] = useState([]);

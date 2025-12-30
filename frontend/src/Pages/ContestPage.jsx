@@ -31,7 +31,7 @@ const ContestPage = () => {
 
   const popupShownRef = useRef(false);
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_URL;
 
   const languageIdMap = { c: 50, cpp: 54, java: 62, python: 71 };
 
