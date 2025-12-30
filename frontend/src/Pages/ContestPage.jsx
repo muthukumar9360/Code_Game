@@ -141,12 +141,15 @@ const ContestPage = () => {
 
     fetchStatus();
 
-    socketRef.current = io(API.replace(/https?:\/\//, "http://"));
+  socketRef.current = io(API, {
+    transports: ["websocket"],
+  });
 
-    socketRef.current.on("connect", () => {
-      console.log("Socket connected");
-      socketRef.current.emit("join-battle", contestId);
-    });
+  socketRef.current.on("connect", () => {
+    console.log("Socket connected:", socketRef.current.id);
+    socketRef.current.emit("join-battle", contestId);
+  });
+
 
     // ✅ FIXED: Handle battle-ended event for BOTH winner and loser
     socketRef.current.on("battle-ended", ({ winner }) => {
