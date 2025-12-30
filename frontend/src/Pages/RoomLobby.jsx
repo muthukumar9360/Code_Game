@@ -10,6 +10,7 @@ const RoomLobby = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const API = import.meta.env.VITE_API_URL;
 
   // ✅ Update players whenever battle changes
   useEffect(() => {
@@ -39,7 +40,7 @@ const RoomLobby = () => {
         }
 
         const res = await fetch(
-          `http://localhost:5000/api/battles/room/${battle.roomId}`,
+          `${API}/api/battles/room/${battle.roomId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -97,7 +98,7 @@ const RoomLobby = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/battles/start/${battle.id}`,
+        `${API}/api/battles/start/${battle.id}`,
         {
           method: "POST",
           headers: {
