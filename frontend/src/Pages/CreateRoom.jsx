@@ -10,6 +10,8 @@ const CreateRoom = () => {
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
+  
+
   const API = import.meta.env.VITE_API_URL;
   const battleTypes = [
     { value: "1vs1", label: "DUEL", description: "1 vs 1 / Head-to-Head" },

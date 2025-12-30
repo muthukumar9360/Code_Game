@@ -10,7 +10,6 @@ const RoomLobby = () => {
   const [players, setPlayers] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-
   const API = import.meta.env.VITE_API_URL;
 
   // ✅ Update players whenever battle changes
