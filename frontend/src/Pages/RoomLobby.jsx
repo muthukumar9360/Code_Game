@@ -66,13 +66,11 @@ const RoomLobby = () => {
     return matchesId || matchesName;
   });
 
-  const isSpectator = Boolean(myParticipant?.isSpectator || location.state?.isSpectator);
   const myApprovalStatus = myParticipant?.approvalStatus || (isHost ? "approved" : (battle?.myApprovalStatus || "approved"));
 
   const pendingRequests = participants.filter(p => p.approvalStatus === "pending");
   const approvedParticipants = participants.filter(p => p.approvalStatus !== "pending" && p.approvalStatus !== "rejected");
-  const approvedPlayers = approvedParticipants.filter(p => !p.isSpectator);
-  const approvedSpectators = approvedParticipants.filter(p => p.isSpectator);
+  const approvedPlayers = approvedParticipants;
 
   const isTeamMode = battle?.battleType === "2vs2" || battle?.battleType === "4vs4";
   const slotsPerTeam = battle?.battleType === "2vs2" ? 2 : (battle?.battleType === "4vs4" ? 4 : 1);
@@ -80,7 +78,6 @@ const RoomLobby = () => {
   const teamBPlayers = approvedPlayers.filter(p => p.team === "B" || (isTeamMode && p.team !== "A"));
 
   const playersCount = approvedPlayers.length;
-  const spectatorsCount = approvedSpectators.length;
   const minRequired = battle?.battleType === "3-ffa" ? 3 : battle?.battleType === "2vs2" ? 4 : battle?.battleType === "4vs4" ? 8 : 2;
   const canStart = playersCount >= minRequired || playersCount >= 1;
 
@@ -396,8 +393,8 @@ const RoomLobby = () => {
           <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-xl bg-[#0a1118] border border-white/40 shadow-md">
             <span className="text-[10px] text-gray-400 font-mono uppercase">User:</span>
             <span className="font-bold text-sm text-orange-400 font-mono">{currentUsername}</span>
-            <span className="text-[10px] px-2 py-0.5 rounded font-black font-mono uppercase border bg-yellow-500/20 text-yellow-400 border-yellow-500/40">
-              {myParticipant?.isSpectator ? "Spectator (YOU)" : "Combatant (YOU)"}
+            <span className="text-[10px] px-2 py-0.5 rounded font-black font-mono uppercase border bg-green-500/20 text-green-400 border-green-500/40">
+              Combatant (YOU)
             </span>
           </div>
 
@@ -433,8 +430,8 @@ const RoomLobby = () => {
                 <span className="font-mono font-black text-orange-400">{activeRoomId}</span>
               </div>
               <div>
-                <span className="text-[10px] text-gray-400 block uppercase font-mono font-bold">Requested Role</span>
-                <span className="font-bold text-white">{myParticipant?.isSpectator ? "Spectator 👁️" : "Competitor ⚔️"}</span>
+                <span className="text-[10px] text-gray-400 block uppercase font-mono font-bold">Role</span>
+                <span className="font-bold text-white">Competitor ⚔️</span>
               </div>
               <div>
                 <span className="text-[10px] text-gray-400 block uppercase font-mono font-bold">Clearance Status</span>
@@ -498,11 +495,9 @@ const RoomLobby = () => {
           <span className={`text-[10px] px-2 py-0.5 rounded font-black font-mono uppercase border ${
             isHost 
               ? "bg-orange-500/20 text-orange-400 border-orange-500/40"
-              : isSpectator
-              ? "bg-blue-500/20 text-blue-400 border-blue-500/40"
               : "bg-green-500/20 text-green-400 border-green-500/40"
           }`}>
-            {isHost ? "Host" : isSpectator ? "Spectator (YOU)" : "Combatant (YOU)"}
+            {isHost ? "Host" : "Combatant (YOU)"}
           </span>
         </div>
 

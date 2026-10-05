@@ -7,7 +7,6 @@ const JoinRoom = () => {
   const [username, setUsername] = useState(localStorage.getItem("username"));
   const [roomCode, setRoomCode] = useState("");
   const [password, setPassword] = useState("");
-  const [isSpectator, setIsSpectator] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -46,7 +45,6 @@ const JoinRoom = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ 
-          isSpectator,
           password: password.trim() || undefined 
         })
       });
@@ -65,8 +63,7 @@ const JoinRoom = () => {
           state: {
             battle: data.battle,
             isHost: false,
-            username: (username || "").trim(),
-            isSpectator
+            username: (username || "").trim()
           }
         });
       } else {
@@ -155,16 +152,6 @@ const JoinRoom = () => {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
-            </div>
-
-            {/* PARTICIPATION MODE */}
-            <div>
-              <label className="text-[10px] uppercase tracking-[0.2em] text-orange-500 font-bold flex items-center gap-2 mb-2">
-                Join Mode
-              </label>
-              <div className="py-3 px-4 rounded-xl border border-orange-500/50 bg-orange-500/20 text-orange-400 text-xs font-bold flex items-center gap-2">
-                <FaUserNinja /> Active Combatant (Competitor)
-              </div>
             </div>
 
             {/* ACTION BUTTON */}

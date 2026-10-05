@@ -144,7 +144,7 @@ io.on('connection', (socket) => {
       problemTitle,
       claimedAt: Date.now()
     });
-    // Also notify room so opponents or spectators can track progress
+    // Also notify room so combatants can track progress
     io.to(roomId).emit('room-problem-claimed', {
       team,
       username,
@@ -221,18 +221,8 @@ io.on('connection', (socket) => {
     io.to(teamChannel).emit('team-exit-execute', { team });
   });
 
-  // Spectator & Opponent Live Cast Telemetry Broadcast
-  socket.on('spectator-stream-update', async ({ roomId, username, code, cursor, testsPassed, totalTests, problemId, language }) => {
-    io.to(roomId).emit('spectator-stream-received', {
-      username,
-      code,
-      cursor,
-      testsPassed,
-      totalTests,
-      updatedAt: Date.now()
-    });
-
-    // Also send directly to other combatants in the arena for post-match solution inspection
+  // Opponent Live Code Telemetry Broadcast (for post-match inspection)
+  socket.on('opponent-code-update', async ({ roomId, username, code, cursor, testsPassed, totalTests, problemId, language }) => {
     socket.to(roomId).emit('opponent-code-update', {
       username,
       code,
@@ -338,8 +328,8 @@ io.on('connection', (socket) => {
           startTime: new Date(),
           status: 'active',
           participants: [
-            { user: validUserId, username, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] },
-            { user: validOpponentUserId, username: opponent.username, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] }
+            { user: validUserId, username, status: 'playing', timeLeft: 30 * 60, assignedProblem: problemIds[0] },
+            { user: validOpponentUserId, username: opponent.username, status: 'playing', timeLeft: 30 * 60, assignedProblem: problemIds[0] }
           ]
         });
         await battle.save();
@@ -436,8 +426,8 @@ io.on('connection', (socket) => {
               startTime: new Date(),
               status: 'active',
               participants: [
-                { user: validUserId, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] },
-                { user: validWaitingUserId, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] }
+                { user: validUserId, status: 'playing', timeLeft: 30 * 60, assignedProblem: problemIds[0] },
+                { user: validWaitingUserId, status: 'playing', timeLeft: 30 * 60, assignedProblem: problemIds[0] }
               ]
             });
             await battle.save();

@@ -98,7 +98,6 @@ const ContestPage = () => {
 
   const opponentParticipant = battle?.participants?.find(
     (p) =>
-      !p.isSpectator &&
       p.user !== myUsername &&
       p.username !== myUsername &&
       p.user?.username !== myUsername &&
@@ -114,7 +113,6 @@ const ContestPage = () => {
   const myTeam = myParticipant?.team && myParticipant.team !== "solo"
     ? myParticipant.team
     : (isTeamMatch ? (location.state?.team || "A") : "solo");
-  const isSpectator = myParticipant?.isSpectator || location.state?.hostRole === "spectator" || location.state?.isSpectator;
   const myTimeLeft = myParticipant?.timeLeft !== undefined && myParticipant?.timeLeft !== null
     ? myParticipant.timeLeft
     : (battle?.duration || 30) * 60;
@@ -161,7 +159,6 @@ const ContestPage = () => {
   // Teammates in my team
   const teammateParticipants = (battle?.participants || []).filter(
     (p) =>
-      !p.isSpectator &&
       (myTeam !== "solo" ? p.team === myTeam : false) &&
       p.user !== myUsername &&
       p.username !== myUsername &&
@@ -267,7 +264,7 @@ const ContestPage = () => {
   // Check if all combatants locked in during pre-battle phase to trigger 5s countdown
   useEffect(() => {
     if (!isTeamMatch || !isSelectionPhase || readyCountdown !== null) return;
-    const activeCombatants = (battle?.participants || []).filter(p => !p.isSpectator);
+    const activeCombatants = battle?.participants || [];
     if (!activeCombatants.length) return;
 
     const allLocked = activeCombatants.every(p => {
@@ -386,11 +383,11 @@ const ContestPage = () => {
 
 
 
-  // Real-time code telemetry streaming for spectators and tournament broadcast
+  // Real-time code telemetry for post-match solution inspection
   useEffect(() => {
-    if (!socketRef.current || isSpectator) return;
+    if (!socketRef.current) return;
     const t = setTimeout(() => {
-      socketRef.current.emit("spectator-stream-update", {
+      socketRef.current.emit("opponent-code-update", {
         roomId: battle?.roomId || contestId,
         username: myUsername,
         code,
@@ -401,7 +398,7 @@ const ContestPage = () => {
       });
     }, 500);
     return () => clearTimeout(t);
-  }, [code, language, results, isSpectator, battle?.roomId, contestId, myUsername, currentProblem]);
+  }, [code, language, results, battle?.roomId, contestId, myUsername, currentProblem]);
 
   // Exit / Abandon Battle handler (Always navigates to results page to review full telemetry)
   const handleExitBattle = useCallback(async (force = false) => {
@@ -507,7 +504,7 @@ const ContestPage = () => {
 
   const { isFullscreen, enterFullscreen, triggerViolation } = useSecureProctoring({
     onTerminate: handleSecurityTermination,
-    enabled: !isSpectator,
+    enabled: true,
     environmentName: isRanked ? "Ranked 1v1 Battle" : "Contest Arena"
   });
 

@@ -65,10 +65,6 @@ const battleSchema = new Schema({
       type: String,
       default: 'solo'
     },
-    isSpectator: {
-      type: Boolean,
-      default: false
-    },
     approvalStatus: {
       type: String,
       enum: ['approved', 'pending', 'rejected'],
@@ -120,11 +116,6 @@ const battleSchema = new Schema({
   maxParticipants: {
     type: Number,
     default: 2
-  },
-  hostRole: {
-    type: String,
-    enum: ['player', 'spectator'],
-    default: 'player'
   },
   startMode: {
     type: String,

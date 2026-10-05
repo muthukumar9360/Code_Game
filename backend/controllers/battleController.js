@@ -188,7 +188,6 @@ export const getBattleStatus = async (req, res) => {
         status: p.status,
         result: p.result,
         team: p.team || 'solo',
-        isSpectator: Boolean(p.isSpectator),
         assignedProblem: p.assignedProblem,
         assignedProblemIndex: p.assignedProblemIndex || 0,
         bestScore: p.bestScore || 0,
@@ -264,7 +263,6 @@ export const createRoom = async (req, res) => {
       duration = 30,
       selectionMode = 'random',
       selectedProblemSlugs = [],
-      hostRole = 'player',
       startMode = 'immediate',
       scheduledStartTime,
       isTournament = false,
@@ -335,7 +333,6 @@ export const createRoom = async (req, res) => {
     const hostParticipant = {
       user: userId,
       status: 'waiting',
-      isSpectator: hostRole === 'spectator',
       approvalStatus: 'approved',
       team: (battleType === '2vs2' || battleType === '4vs4') ? 'A' : 'solo',
       assignedProblem: selectedProblems[0]._id
@@ -351,7 +348,6 @@ export const createRoom = async (req, res) => {
       battleType,
       duration: parseInt(duration) || 30,
       maxParticipants: maxLimit,
-      hostRole,
       startMode,
       scheduledStartTime: scheduledStartTime ? new Date(scheduledStartTime) : null,
       isTournament: Boolean(isTournament || battleType === 'contest'),
@@ -376,7 +372,6 @@ export const createRoom = async (req, res) => {
         selectionMode: battle.selectionMode,
         duration: battle.duration,
         host: user.username,
-        hostRole: battle.hostRole,
         isTournament: battle.isTournament,
         requiresApproval: battle.requiresApproval,
         maxParticipants: battle.maxParticipants,
@@ -385,7 +380,6 @@ export const createRoom = async (req, res) => {
           userId: user._id,
           status: 'waiting',
           team: hostParticipant.team,
-          isSpectator: hostParticipant.isSpectator,
           approvalStatus: 'approved'
         }],
         status: battle.status
@@ -403,7 +397,6 @@ export const joinRoom = async (req, res) => {
   try {
     const { roomId } = req.params;
     const userId = req.user.id;
-    const isSpectator = req.body?.isSpectator === true;
 
     const battle = await Battle.findOne({ roomId })
       .populate('participants.user', 'username tier')
@@ -455,7 +448,6 @@ export const joinRoom = async (req, res) => {
             tier: p.user?.tier,
             status: p.status,
             team: p.team || 'solo',
-            isSpectator: p.isSpectator || false,
             approvalStatus: p.approvalStatus || 'approved'
           })),
           status: battle.status
@@ -463,16 +455,16 @@ export const joinRoom = async (req, res) => {
       });
     }
 
-    const activeApprovedPlayers = battle.participants.filter(p => !p.isSpectator && p.approvalStatus !== 'rejected');
+    const activeApprovedPlayers = battle.participants.filter(p => p.approvalStatus !== 'rejected');
     const maxLimit = battle.maxParticipants || 2;
-    if (!isSpectator && activeApprovedPlayers.length >= maxLimit) {
-      return res.status(400).json({ error: 'Room is full for active players. You may join as a spectator.' });
+    if (activeApprovedPlayers.length >= maxLimit) {
+      return res.status(400).json({ error: 'Room is full. Maximum participant capacity reached.' });
     }
 
     let team = 'solo';
     if (battle.battleType === '2vs2' || battle.battleType === '4vs4') {
-      const teamACount = battle.participants.filter(p => p.team === 'A' && !p.isSpectator && p.approvalStatus !== 'rejected').length;
-      const teamBCount = battle.participants.filter(p => p.team === 'B' && !p.isSpectator && p.approvalStatus !== 'rejected').length;
+      const teamACount = battle.participants.filter(p => p.team === 'A' && p.approvalStatus !== 'rejected').length;
+      const teamBCount = battle.participants.filter(p => p.team === 'B' && p.approvalStatus !== 'rejected').length;
       team = teamACount <= teamBCount ? 'A' : 'B';
     }
 
@@ -483,7 +475,6 @@ export const joinRoom = async (req, res) => {
       user: userId,
       status: 'waiting',
       team,
-      isSpectator,
       approvalStatus: initialApprovalStatus
     });
     await battle.save();
@@ -506,7 +497,6 @@ export const joinRoom = async (req, res) => {
         tier: p.user?.tier,
         status: p.status,
         team: p.team || 'solo',
-        isSpectator: p.isSpectator || false,
         approvalStatus: p.approvalStatus || 'approved'
       })),
       status: battle.status
@@ -522,7 +512,6 @@ export const joinRoom = async (req, res) => {
           userId,
           user: joinedUser?.user?.username || 'Competitor',
           tier: joinedUser?.user?.tier,
-          isSpectator,
           approvalStatus: 'pending'
         });
       }
@@ -623,7 +612,6 @@ export const getRoomStatus = async (req, res) => {
         selectionMode: battle.selectionMode,
         duration: battle.duration,
         tier: battle.tier,
-        hostRole: battle.hostRole,
         startMode: battle.startMode,
         scheduledStartTime: battle.scheduledStartTime,
         maxParticipants: battle.maxParticipants,
@@ -636,7 +624,6 @@ export const getRoomStatus = async (req, res) => {
           tier: p.user?.tier,
           status: p.status,
           team: p.team || 'solo',
-          isSpectator: p.isSpectator || false,
           approvalStatus: p.approvalStatus || 'approved',
           assignedProblem: p.assignedProblem
         })),
@@ -651,7 +638,7 @@ export const getRoomStatus = async (req, res) => {
   }
 };
 
-// Approve or reject a participant or spectator in the room (Host / Admin only)
+// Approve or reject a participant in the room (Host / Admin only)
 export const approveParticipant = async (req, res) => {
   try {
     const { roomId } = req.params;
@@ -680,10 +667,10 @@ export const approveParticipant = async (req, res) => {
     if (action === 'approve') {
       const maxLimit = battle.maxParticipants || (battle.battleType === '2vs2' ? 4 : (battle.battleType === '4vs4' ? 8 : (battle.battleType === '3-ffa' ? 3 : 2)));
       const activeApproved = battle.participants.filter(
-        p => !p.isSpectator && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
+        p => p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
       );
 
-      if (!participant.isSpectator && activeApproved.length >= maxLimit) {
+      if (activeApproved.length >= maxLimit) {
         return res.status(400).json({ error: `Cannot approve: Battle room is already at full capacity (${maxLimit} players). Space is full.` });
       }
 
@@ -691,7 +678,7 @@ export const approveParticipant = async (req, res) => {
         const assignedTeam = (team === 'A' || team === 'B') ? team : (participant.team === 'B' ? 'B' : 'A');
         const maxPerTeam = battle.battleType === '2vs2' ? 2 : 4;
         const currentTeamCount = battle.participants.filter(
-          p => p.team === assignedTeam && !p.isSpectator && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
+          p => p.team === assignedTeam && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
         ).length;
 
         if (currentTeamCount >= maxPerTeam) {
@@ -720,7 +707,6 @@ export const approveParticipant = async (req, res) => {
       problemCount: battle.problemCount || 1,
       duration: battle.duration,
       tier: battle.tier,
-      hostRole: battle.hostRole,
       requiresApproval: battle.requiresApproval,
       isTournament: battle.isTournament,
       maxParticipants: battle.maxParticipants,
@@ -730,7 +716,6 @@ export const approveParticipant = async (req, res) => {
         tier: p.user?.tier,
         status: p.status,
         team: p.team || 'solo',
-        isSpectator: p.isSpectator || false,
         approvalStatus: p.approvalStatus || 'approved'
       })),
       status: battle.status
@@ -799,7 +784,7 @@ export const reassignParticipantTeam = async (req, res) => {
     // Verify team capacity for squad/duo
     const maxPerTeam = battle.battleType === '2vs2' ? 2 : (battle.battleType === '4vs4' ? 4 : 10);
     const targetTeamCount = battle.participants.filter(
-      p => p.team === team && !p.isSpectator && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
+      p => p.team === team && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
     ).length;
 
     if (targetTeamCount >= maxPerTeam) {
@@ -818,7 +803,6 @@ export const reassignParticipantTeam = async (req, res) => {
       problemCount: battle.problemCount || 1,
       duration: battle.duration,
       tier: battle.tier,
-      hostRole: battle.hostRole,
       requiresApproval: battle.requiresApproval,
       isTournament: battle.isTournament,
       maxParticipants: battle.maxParticipants,
@@ -828,7 +812,6 @@ export const reassignParticipantTeam = async (req, res) => {
         tier: p.user?.tier,
         status: p.status,
         team: p.team || 'solo',
-        isSpectator: p.isSpectator || false,
         approvalStatus: p.approvalStatus || 'approved'
       })),
       status: battle.status
@@ -1091,7 +1074,7 @@ export const startBattle = async (req, res) => {
     }
 
     const activeParticipants = battle.participants.filter(
-      p => !p.isSpectator && p.approvalStatus !== 'pending' && p.approvalStatus !== 'rejected'
+      p => p.approvalStatus !== 'pending' && p.approvalStatus !== 'rejected'
     );
     if (activeParticipants.length < minParticipants) {
       return res.status(400).json({ error: `Need at least ${minParticipants} approved active player(s) to start a ${battle.battleType} battle` });
@@ -1124,7 +1107,6 @@ export const startBattle = async (req, res) => {
       let teamACount = 0;
       let teamBCount = 0;
       for (const p of battle.participants) {
-        if (p.isSpectator) continue;
         if (p.team === 'A') {
           p.assignedProblem = problemList[teamACount % problemList.length];
           p.assignedProblemIndex = teamACount % problemList.length;
@@ -1163,7 +1145,6 @@ export const startBattle = async (req, res) => {
         user: p.user?.username || participantUserId(p),
         status: p.status,
         team: p.team || 'solo',
-        isSpectator: p.isSpectator || false,
         assignedProblem: p.assignedProblem,
         assignedProblemIndex: p.assignedProblemIndex || 0
       })),
@@ -1356,7 +1337,6 @@ export const getBattleSummary = async (req, res) => {
         bestScore: p.bestScore || 0,
         submissionTime: p.submissionTime,
         team: p.team || 'solo',
-        isSpectator: p.isSpectator || false,
         code: fallbackCode,
         language: fallbackLang,
         lastCode: p.lastCode || "",

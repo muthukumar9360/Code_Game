@@ -33,7 +33,6 @@ const CreateRoom = () => {
   const [accessPassword, setAccessPassword] = useState("");
   const [securityMode, setSecurityMode] = useState("open"); // 'open' | 'password'
   const [selectionMode, setSelectionMode] = useState("random"); // 'random' or 'manual'
-  const [hostRole, setHostRole] = useState("player"); // 'player' or 'spectator'
   const [startMode, setStartMode] = useState("immediate"); // 'immediate' or 'scheduled'
   const [scheduledMinutes, setScheduledMinutes] = useState(5);
   const [maxParticipants, setMaxParticipants] = useState(2);
@@ -145,7 +144,6 @@ const CreateRoom = () => {
         duration: totalDuration,
         selectionMode,
         selectedProblemSlugs: selectionMode === "manual" ? selectedSlugs : [],
-        hostRole,
         startMode,
         scheduledStartTime,
         maxParticipants: parseInt(maxParticipants) || 2,
@@ -178,8 +176,7 @@ const CreateRoom = () => {
           state: {
             battle: data.battle,
             isHost: true,
-            username: (username || "").trim(),
-            hostRole
+            username: (username || "").trim()
           }
         });
       } else {

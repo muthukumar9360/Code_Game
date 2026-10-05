@@ -17,7 +17,7 @@ const CodeDiffViewer = ({
   currentUsername
 }) => {
   const activeParticipants = useMemo(() => {
-    return (participants || []).filter(p => !p.isSpectator);
+    return participants || [];
   }, [participants]);
 
   const problemsList = useMemo(() => {
