@@ -15,7 +15,7 @@ const battleSchema = new Schema({
     },
     status: {
       type: String,
-      enum: ['waiting', 'ready', 'submitted', 'finished'],
+      enum: ['waiting', 'ready', 'playing', 'active', 'submitted', 'finished'],
       default: 'waiting'
     },
     submissionTime: Date,
@@ -36,12 +36,54 @@ const battleSchema = new Schema({
       type: Schema.Types.ObjectId,
       ref: 'Submission',
       default: null
+    },
+    assignedProblem: {
+      type: Schema.Types.ObjectId,
+      ref: 'Problem',
+      default: null
+    },
+    assignedProblemIndex: {
+      type: Number,
+      default: 0
+    },
+    solvedProblems: [{
+      type: Schema.Types.ObjectId,
+      ref: 'Problem'
+    }],
+    team: {
+      type: String,
+      default: 'solo'
+    },
+    isSpectator: {
+      type: Boolean,
+      default: false
+    },
+    approvalStatus: {
+      type: String,
+      enum: ['approved', 'pending', 'rejected'],
+      default: 'approved'
+    },
+    warningsCount: {
+      type: Number,
+      default: 0
     }
   }],
   problem: {
     type: Schema.Types.ObjectId,
-    ref: "Problem",
-    required: true
+    ref: "Problem"
+  },
+  problems: [{
+    type: Schema.Types.ObjectId,
+    ref: "Problem"
+  }],
+  problemCount: {
+    type: Number,
+    default: 1
+  },
+  selectionMode: {
+    type: String,
+    enum: ['random', 'manual'],
+    default: 'random'
   },
   status: {
     type: String,
@@ -57,12 +99,49 @@ const battleSchema = new Schema({
   tier: {
     type: String,
     enum: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'],
-    required: true
+    required: true,
+    default: 'Bronze'
   },
   battleType: {
     type: String,
-    enum: ['1vs1', '2vs2', '4vs4'],
     default: '1vs1'
+  },
+  maxParticipants: {
+    type: Number,
+    default: 2
+  },
+  hostRole: {
+    type: String,
+    enum: ['player', 'spectator'],
+    default: 'player'
+  },
+  startMode: {
+    type: String,
+    enum: ['immediate', 'scheduled'],
+    default: 'immediate'
+  },
+  scheduledStartTime: Date,
+  scheduledEndTime: Date,
+  isTournament: {
+    type: Boolean,
+    default: false
+  },
+  tournamentMode: {
+    type: String,
+    enum: ['real', 'friendly'],
+    default: 'real'
+  },
+  requiresApproval: {
+    type: Boolean,
+    default: false
+  },
+  accessPassword: {
+    type: String,
+    default: null
+  },
+  isRanked: {
+    type: Boolean,
+    default: false
   },
   roomId: {
     type: String,

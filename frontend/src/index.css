@@ -1,1 +1,71 @@
 @import "tailwindcss";
+
+@theme {
+  --color-gray-300: #ffffff;
+  --color-gray-400: #ffffff;
+  --color-gray-500: #ffffff;
+}
+
+/* Ensure all gray/muted text classes across every page render in high-contrast pure white */
+.text-gray-300,
+.text-gray-400,
+.text-gray-500,
+.text-slate-300,
+.text-slate-400,
+.text-slate-500,
+.text-zinc-300,
+.text-zinc-400,
+.text-zinc-500 {
+  color: #ffffff !important;
+}
+
+html,
+body,
+#root {
+  background-color: #050b10 !important;
+  color: #ffffff;
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+}
+
+/* Custom sleek high-visibility scrollbar / sliders */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050b10;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: rgba(5, 11, 16, 0.7);
+  border-radius: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #f97316;
+}

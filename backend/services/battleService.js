@@ -1,6 +1,7 @@
 import Battle from '../models/Battle.js';
 import Problem from '../models/Problem.js';
 import Submission from '../models/Submission.js';
+import { awardBattleRewards } from './rewardService.js';
 
 export const startBattle = async (battleId) => {
   try {
@@ -9,9 +10,15 @@ export const startBattle = async (battleId) => {
 
     // Assign a random problem if not assigned
     if (!battle.problem) {
-      const problems = await Problem.find({ difficulty: getDifficultyFromTier(battle.tier) });
-      const randomProblem = problems[Math.floor(Math.random() * problems.length)];
-      battle.problem = randomProblem._id;
+      const difficulty = getDifficultyFromTier(battle.tier);
+      const problems = await Problem.find({ difficulty });
+      if (problems && problems.length > 0) {
+        const randomProblem = problems[Math.floor(Math.random() * problems.length)];
+        battle.problem = randomProblem._id;
+      } else {
+        const fallbackProblem = await Problem.findOne();
+        if (fallbackProblem) battle.problem = fallbackProblem._id;
+      }
     }
 
     battle.status = 'active';
@@ -39,7 +46,6 @@ export const endBattle = async (battleId) => {
     battle.endTime = new Date();
 
     // Determine results for all participants using their best submission
-    // Fetch submissions grouped by user and pick the best (max passed testcases)
     const problem = await Problem.findById(battle.problem);
     const totalTests = problem?.testcases?.length || 0;
 
@@ -73,20 +79,29 @@ export const endBattle = async (battleId) => {
     const maxScore = Math.max(...scores);
     const winners = battle.participants.filter(p => (p.bestScore || 0) === maxScore);
 
-    if (winners.length === 1) {
-      for (const p of battle.participants) {
-        if (p._id.toString() === winners[0]._id.toString()) p.result = 'win';
-        else p.result = 'lose';
+    if (maxScore > 0) {
+      if (winners.length === 1) {
+        for (const p of battle.participants) {
+          if (p._id.toString() === winners[0]._id.toString()) p.result = 'win';
+          else p.result = 'lose';
+        }
+      } else {
+        for (const p of battle.participants) {
+          if ((p.bestScore || 0) === maxScore) p.result = 'draw';
+          else p.result = 'lose';
+        }
       }
     } else {
-      // tie
+      // No one scored
       for (const p of battle.participants) {
-        if ((p.bestScore || 0) === maxScore) p.result = 'draw';
-        else p.result = 'lose';
+        p.result = 'draw';
       }
     }
 
     await battle.save();
+
+    // Award battle rewards
+    await awardBattleRewards(battle.participants, battle);
 
     return battle;
   } catch (error) {
@@ -98,8 +113,8 @@ export const endBattle = async (battleId) => {
 export const getBattleStatus = async (battleId) => {
   try {
     const battle = await Battle.findById(battleId)
-      .populate('participants.user', 'username tier')
-      .populate('problem', 'title description');
+      .populate('participants.user', 'username tier xp')
+      .populate('problem', 'title description examples testcases');
 
     if (!battle) throw new Error('Battle not found');
 
@@ -112,11 +127,12 @@ export const getBattleStatus = async (battleId) => {
 
 const getDifficultyFromTier = (tier) => {
   const tierDifficulties = {
-    'Bronze': 'Easy',
-    'Silver': 'Easy',
-    'Gold': 'Medium',
-    'Platinum': 'Medium',
-    'Diamond': 'Hard'
+    'Bronze': 'easy',
+    'Silver': 'easy',
+    'Gold': 'medium',
+    'Platinum': 'medium',
+    'Diamond': 'hard'
   };
-  return tierDifficulties[tier] || 'Easy';
+  return tierDifficulties[tier] || 'easy';
 };
+

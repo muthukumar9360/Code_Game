@@ -1,47 +1,58 @@
 import React from "react";
-import {FaTimes} from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+import { FaTimes, FaTrophy, FaTimesCircle, FaArrowRight } from "react-icons/fa";
 
 const ResultPopup = ({ isWinner, winnerName, onClose }) => {
-  const navigate = useNavigate();
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70">
-      <div className="bg-white w-[550px] p-8 rounded-2xl shadow-2xl text-center animate-scaleIn">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
+      <div className="relative bg-[#0a1118] border border-white/20 w-full max-w-md p-8 rounded-3xl shadow-[0_0_50px_rgba(0,0,0,0.8)] text-center">
+        {/* CLOSE BUTTON */}
+        <button
+          onClick={onClose}
+          className="absolute top-5 right-5 text-gray-400 hover:text-white transition p-2 rounded-full hover:bg-white/5"
+          title="Close"
+        >
+          <FaTimes />
+        </button>
+
+        {/* ICON */}
+        <div className="flex justify-center mb-4">
+          <div className={`w-20 h-20 rounded-3xl flex items-center justify-center ${
+            isWinner ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/30' : 'bg-red-500/10 text-red-500 border border-red-500/30'
+          }`}>
+            {isWinner ? <FaTrophy size={40} className="animate-bounce" /> : <FaTimesCircle size={40} />}
+          </div>
+        </div>
 
         {/* TITLE */}
-        <h2 className="text-3xl font-extrabold text-[#0f2735] mb-4">
-          Contest Result
+        <h2 className="text-2xl font-black uppercase tracking-tight text-white mb-2">
+          {isWinner ? "MISSION ACCOMPLISHED" : "MISSION COMPROMISED"}
         </h2>
-        {/* CLOSE BUTTON */}
-<button
-  onClick={() => navigate("/")}
-  className="absolute top-4 right-4 text-white-400 hover:text-orange-500 text-2xl transition"
-  title="Go to Home"
->
-  <FaTimes />
-</button>
 
-
-
-        {/* RESULT MESSAGE */}
-        {isWinner ? (
-          <div className="bg-green-500 text-white py-4 rounded-xl text-2xl font-bold mb-6">
-            🎉 CONGRATULATIONS 🎉 <br />
-            YOU WIN 🏆
-          </div>
-        ) : (
-          <div className="bg-red-500 text-white py-4 rounded-xl text-2xl font-bold mb-6">
-            ❌ SORRY <br />
-            {winnerName} WINS 🥇
-          </div>
-        )}
+        {/* MESSAGE */}
+        <div className={`py-4 px-6 rounded-2xl mb-6 font-mono text-sm border ${
+          isWinner
+            ? "bg-green-500/10 text-green-400 border-green-500/30"
+            : "bg-red-500/10 text-red-400 border-red-500/30"
+        }`}>
+          {isWinner ? (
+            <div>
+              <div className="font-bold text-base mb-1">VICTORY SECURED 🏆</div>
+              <div className="text-xs opacity-80">All test verification nodes passed.</div>
+            </div>
+          ) : (
+            <div>
+              <div className="font-bold text-base mb-1">DEFEAT ❌</div>
+              <div className="text-xs opacity-80">{winnerName ? `${winnerName} completed the objective first.` : "Contest ended."}</div>
+            </div>
+          )}
+        </div>
 
         {/* BUTTON */}
         <button
           onClick={onClose}
-          className="bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 px-8 rounded-xl shadow-lg transition"
+          className="w-full bg-orange-500 hover:bg-orange-400 text-black font-black py-3.5 px-6 rounded-xl text-xs uppercase tracking-[0.2em] transition hover:scale-[1.02] active:scale-95 shadow-lg flex items-center justify-center gap-2"
         >
-          View Results
+          VIEW MISSION TELEMETRY <FaArrowRight />
         </button>
       </div>
     </div>

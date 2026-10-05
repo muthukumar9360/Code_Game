@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { FaEye, FaEyeSlash } from "react-icons/fa";
+import BackButton from "../Components/BackButton.jsx";
 
 const Signup = () => {
   const navigate = useNavigate();
@@ -47,15 +48,20 @@ const Signup = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-[#050b10] relative overflow-hidden text-white">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-[#050b10] relative overflow-hidden text-white p-4">
 
       {/* BACKGROUND GLOWS */}
       <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-orange-600/20 blur-[120px] rounded-full"></div>
       <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/10 blur-[120px] rounded-full"></div>
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
 
+      {/* TOP BAR WITH BACK BUTTON */}
+      <div className="w-full max-w-[950px] flex justify-start mb-4 z-20">
+        <BackButton to="/" label="Home" />
+      </div>
+
       {/* MAIN CARD */}
-      <div className="relative z-10 flex w-[950px] h-[700px] rounded-3xl overflow-hidden border border-white/10 backdrop-blur-xl shadow-2xl">
+      <div className="relative z-10 flex w-[950px] max-w-full h-[650px] rounded-3xl overflow-hidden border-2 border-white/40 backdrop-blur-xl shadow-2xl">
 
         {/* LEFT SIDE IMAGE */}
         <div className="w-1/2 relative">
@@ -88,8 +94,8 @@ const Signup = () => {
                 value={fullname}
                 placeholder="Enter full name"
                 onChange={(e) => setFullname(e.target.value)}
-                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
-                focus:ring-2 focus:ring-orange-500 transition"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/30 outline-none
+                focus:border-white focus:ring-1 focus:ring-white transition"
               />
             </div>
 
@@ -103,8 +109,8 @@ const Signup = () => {
                 value={username}
                 placeholder="Choose username"
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
-                focus:ring-2 focus:ring-orange-500 transition"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/30 outline-none
+                focus:border-white focus:ring-1 focus:ring-white transition"
               />
             </div>
 
@@ -118,8 +124,8 @@ const Signup = () => {
                 value={email}
                 placeholder="Enter email"
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
-                focus:ring-2 focus:ring-orange-500 transition"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/30 outline-none
+                focus:border-white focus:ring-1 focus:ring-white transition"
               />
             </div>
 
@@ -133,8 +139,8 @@ const Signup = () => {
                 value={password}
                 placeholder="Enter password"
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
-                focus:ring-2 focus:ring-orange-500 transition pr-12"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/30 outline-none
+                focus:border-white focus:ring-1 focus:ring-white transition pr-12"
               />
 
               <span
@@ -155,8 +161,8 @@ const Signup = () => {
                 value={confirmPassword}
                 placeholder="Re-enter password"
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/10 outline-none
-                focus:ring-2 focus:ring-orange-500 transition pr-12"
+                className="w-full mt-2 px-4 py-3 rounded-xl bg-black/40 border border-white/30 outline-none
+                focus:border-white focus:ring-1 focus:ring-white transition pr-12"
               />
 
               <span

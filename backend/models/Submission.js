@@ -11,7 +11,16 @@ const submissionSchema = new Schema({
   battle: {
     type: Schema.Types.ObjectId,
     ref: "Battle",
-    required: true
+    required: false
+  },
+  problem: {
+    type: Schema.Types.ObjectId,
+    ref: "Problem",
+    required: false
+  },
+  isDailyChallenge: {
+    type: Boolean,
+    default: false
   },
   code: {
     type: String,
@@ -35,12 +44,12 @@ const submissionSchema = new Schema({
   status: {
     type: String,
     enum: ['pending', 'running', 'completed', 'failed'],
-    default: 'pending'
+    default: 'completed'
   },
   overallResult: {
     type: String,
-    enum: ['accepted', 'wrong_answer', 'time_limit_exceeded', 'runtime_error', 'compilation_error'],
-    default: 'accepted'
+    enum: ['accepted', 'passed', 'wrong_answer', 'failed', 'time_limit_exceeded', 'runtime_error', 'compilation_error'],
+    default: 'wrong_answer'
   },
   submittedAt: {
     type: Date,

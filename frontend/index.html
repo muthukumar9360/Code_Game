@@ -4,10 +4,26 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/logo.jpg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Battlix</title>
+    <meta name="theme-color" content="#f97316" />
+    <title>Battlix: Competitive Coding Arena</title>
   </head>
-  <body>
-    <div id="root"></div>
+  <body class="bg-[#050b10] text-white min-h-screen">
+    <div id="root" class="min-h-screen bg-[#050b10]"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Clear any legacy service worker cache so code changes and removals reflect immediately
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(registrations) {
+          for (var r of registrations) {
+            r.unregister();
+          }
+        });
+      }
+      if ('caches' in window) {
+        caches.keys().then(function(names) {
+          for (var name of names) caches.delete(name);
+        });
+      }
+    </script>
   </body>
 </html>

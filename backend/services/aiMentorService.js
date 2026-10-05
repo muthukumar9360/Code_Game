@@ -1,70 +1,75 @@
-import OpenAI from 'openai';
 import Problem from '../models/Problem.js';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+const TOPIC_GUIDANCE = {
+  'array': 'Consider iterating through the array while maintaining state (e.g. prefix sums, two pointers, or a sliding window).',
+  'string': 'Look for common substring patterns, frequency counting of characters with a hash map, or two-pointer traversal.',
+  'hash table': 'Use a dictionary or map for O(1) average lookup time to store elements or frequencies you have already visited.',
+  'two pointers': 'If the collection is sorted or monotonic, placing pointers at both ends can reduce time complexity from O(N^2) to O(N).',
+  'binary search': 'If the search space is monotonic or sorted, check the midpoint and halve your search range on each step.',
+  'dynamic programming': 'Identify overlapping subproblems. Define a dp array or state where dp[i] depends on previously computed smaller states.',
+  'recursion': 'Identify your base case first where recursion terminates, then solve the subproblem on the remaining input.',
+  'sorting': 'Sorting the input array first may reveal patterns and simplify checking duplicates or ranges in O(N log N) time.',
+  'stack': 'A stack can track elements in LIFO order—useful for matching parentheses or finding the next greater/smaller element.',
+  'queue': 'A queue is ideal for FIFO processing, such as breadth-first search (BFS) level-order traversal.',
+  'graph': 'Model the relationships as nodes and edges. Use BFS for shortest unweighted paths or DFS for connected components.',
+  'tree': 'Trees are naturally recursive structures. Preorder, inorder, or postorder traversals often solve subproblems on left and right children.'
+};
 
-export const getHint = async (problemSlug, userTier, hintLevel) => {
+// Retrieve hint: 100% database-driven with offline fallback
+export const getHint = async (problemSlug, userTier = 'Bronze', hintLevel = 1) => {
   try {
     const problem = await Problem.findOne({ slug: problemSlug });
     if (!problem) {
-      throw new Error('Problem not found');
+      return 'Carefully analyze the problem constraints and boundary conditions.';
     }
 
+    // 1. Primary: Return stored hint directly from MongoDB
     const hintKey = `h${hintLevel}`;
-    if (problem.hints[hintKey]) {
-      return problem.hints[hintKey];
+    if (problem.hints && problem.hints[hintKey] && problem.hints[hintKey].trim()) {
+      return problem.hints[hintKey].trim();
     }
 
-    // If no predefined hint, generate one using AI
-    const prompt = `As an AI coding mentor, provide a helpful hint for the following coding problem without revealing the solution. The user is at ${userTier} tier.
+    // Check if any other hint level is filled in DB
+    if (problem.hints) {
+      for (const k of ['h1', 'h2', 'h3']) {
+        if (problem.hints[k] && problem.hints[k].trim()) {
+          return problem.hints[k].trim();
+        }
+      }
+    }
 
-Problem Title: ${problem.title}
-Difficulty: ${problem.difficulty}
-Description: ${problem.description}
+    // 2. Offline Fallback: Context-aware guidance based on Problem topics
+    const topics = Array.isArray(problem.topics) ? problem.topics.map(t => t.toLowerCase()) : [];
+    for (const t of topics) {
+      for (const [key, advice] of Object.entries(TOPIC_GUIDANCE)) {
+        if (t.includes(key)) {
+          return `Tactical Hint (${t.toUpperCase()}): ${advice}`;
+        }
+      }
+    }
 
-Provide a hint that guides the user towards the solution without giving it away.`;
+    // 3. Fallback based on difficulty
+    if (problem.difficulty === 'easy') {
+      return 'Tactical Hint: Focus on a straightforward iterative approach. Verify edge cases like empty inputs or boundary values.';
+    } else if (problem.difficulty === 'hard') {
+      return 'Tactical Hint: A brute-force approach may exceed time limits. Look for memoization, monotonic structures, or mathematical invariants.';
+    }
 
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 150,
-      temperature: 0.7
-    });
-
-    return response.choices[0].message.content.trim();
+    return 'Tactical Hint: Consider storing intermediate results in a map or hash set to avoid duplicate calculations.';
   } catch (error) {
-    console.error('Error getting AI hint:', error);
-    return 'Sorry, I\'m unable to provide a hint right now. Try reviewing the problem description and examples.';
+    return 'Examine the problem constraints: consider time and space complexity tradeoffs.';
   }
 };
 
-export const getExplanation = async (problemSlug, userCode, language) => {
+// Code explanation fallback
+export const getExplanation = async (problemSlug, userCode, language = 'python') => {
   try {
     const problem = await Problem.findOne({ slug: problemSlug });
     if (!problem) {
-      throw new Error('Problem not found');
+      return 'Review your logic against the sample inputs and outputs.';
     }
-
-    const prompt = `As an AI coding mentor, provide a brief explanation of why this code might be correct or incorrect for the problem. Don't give away the full solution.
-
-Problem: ${problem.title}
-User's Code (${language}):
-${userCode}
-
-Provide a constructive explanation.`;
-
-    const response = await openai.chat.completions.create({
-      model: 'gpt-3.5-turbo',
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 200,
-      temperature: 0.7
-    });
-
-    return response.choices[0].message.content.trim();
+    return `Ensure your ${language} implementation handles all constraints, including zero/empty inputs and maximum boundary values.`;
   } catch (error) {
-    console.error('Error getting AI explanation:', error);
-    return 'Unable to provide explanation at this time.';
+    return 'Verify boundary conditions and algorithm logic.';
   }
 };

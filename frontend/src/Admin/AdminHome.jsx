@@ -43,7 +43,7 @@ const AdminHome = () => {
       <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-10"></div>
 
       {/* 🔥 NAVBAR */}
-      <nav className="w-full py-5 flex justify-between items-center px-10 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
+      <nav className="w-full py-4 flex justify-between items-center px-4 sm:px-6 md:px-8 backdrop-blur-md border-b border-white/10 sticky top-0 z-50">
         <h1 className="text-3xl font-black tracking-tighter italic">
           BATT
           <span className="text-orange-500 drop-shadow-[0_0_10px_rgba(249,115,22,0.8)]">
@@ -186,7 +186,7 @@ const AdminHome = () => {
       </main>
 
       {/* 🧾 FOOTER */}
-      <footer className="w-full py-6 px-10 flex justify-between items-center border-t border-white/5 text-[10px] uppercase tracking-[0.2em] text-gray-500">
+      <footer className="w-full py-4 px-4 sm:px-6 md:px-8 flex justify-between items-center border-t border-white/5 text-[10px] uppercase tracking-[0.2em] text-gray-500">
         <span>© {new Date().getFullYear()} BATTLLIX // ADMIN_CORE</span>
         <span className="hover:text-white transition">SYSTEM STATUS: STABLE</span>
       </footer>

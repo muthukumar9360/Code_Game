@@ -7,33 +7,39 @@ import {
   endBattleManually,
   createRoom,
   joinRoom,
+  leaveRoom,
   getRoomStatus,
+  approveParticipant,
   startBattle,
   submitSolution,
-  getMyContestHistory
+  abandonBattle,
+  getBattleSummary,
+  getMyContestHistory,
+  getHackathonReport
 } from '../controllers/battleController.js';
 
 const router = express.Router();
 
-// Create a new battle room (host)
+// Battle Room Lifecycle
 router.post('/create-room', authMiddleware, createRoom);
-
-// Join an existing battle room
 router.post('/join-room/:roomId', authMiddleware, joinRoom);
-
-// Get room status (for lobby)
+router.post('/leave-room/:roomId', authMiddleware, leaveRoom);
 router.get('/room/:roomId', authMiddleware, getRoomStatus);
+router.post('/room/:roomId/approve', authMiddleware, approveParticipant);
 
-// Start the battle (host only)
+// Contest Execution
 router.post('/start/:battleId', authMiddleware, startBattle);
-
-// Submit solution during battle
 router.post('/:battleId/submit', authMiddleware, submitSolution);
+router.post('/:battleId/abandon', authMiddleware, abandonBattle);
+router.get('/:battleId/summary', authMiddleware, getBattleSummary);
+router.get('/:battleId/hackathon-report', authMiddleware, getHackathonReport);
 
-// Existing battle routes
+// Legacy / Direct endpoints
 router.post('/create', authMiddleware, createBattle);
 router.get('/:battleId/status', authMiddleware, getBattleStatus);
 router.post('/:battleId/end', authMiddleware, endBattleManually);
 
+// User contest history
 router.get('/my-history', authMiddleware, getMyContestHistory);
+
 export default router;
