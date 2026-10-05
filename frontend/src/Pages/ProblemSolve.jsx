@@ -16,7 +16,8 @@ import {
   FaTimes,
   FaEye,
   FaCopy,
-  FaCheck
+  FaCheck,
+  FaUser
 } from "react-icons/fa";
 import CustomTestcasePlayground from "../Components/CustomTestcasePlayground.jsx";
 import { SplitDivider, useResizableSplit } from "../Components/SplitDivider.jsx";
@@ -433,6 +434,18 @@ const ProblemSolve = () => {
           <span className="px-2.5 py-0.5 bg-white/5 border border-white/30 rounded-full text-[10px] uppercase font-mono tracking-wider text-white">
             Practice Module
           </span>
+        </div>
+
+        {/* LOGGED IN USER STATUS */}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-white/5 border border-white/20 px-3 py-1.5 rounded-xl font-mono text-xs shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <FaUser className="text-orange-400 text-xs" />
+            <span className="text-gray-400">User:</span>
+            <span className="text-white font-bold tracking-wide">
+              {localStorage.getItem("username") || "Combatant"}
+            </span>
+          </div>
         </div>
       </nav>
 

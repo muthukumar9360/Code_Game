@@ -39,6 +39,9 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
 
     // Incoming team chat message
     socket.on("team-chat-received", (msg) => {
+      if (msg.sender && msg.sender.trim().toLowerCase() === username?.trim().toLowerCase()) {
+        return;
+      }
       setMessages((prev) => [...prev.slice(-30), msg]);
     });
 
@@ -279,33 +282,35 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
           </div>
 
           {/* CHAT MESSAGES */}
-          <div className="p-3 h-52 overflow-y-auto space-y-2.5 text-xs font-sans">
+          <div className="p-3 h-60 overflow-y-auto space-y-3 text-xs font-sans custom-scrollbar">
             {messages.length === 0 ? (
-              <div className="text-center text-gray-500 text-[11px] pt-12">
-                🔒 Private squad channel. Messages sent here are invisible to rival combatants.
+              <div className="text-center text-gray-500 text-[11px] pt-14 font-mono">
+                🔒 Squad Uplink. Messages sent here are private to Team {team}.
               </div>
             ) : (
               messages.map((m, idx) => {
-                const isMe = m.sender === username;
+                const isMe = m.sender?.trim().toLowerCase() === username?.trim().toLowerCase();
                 return (
                   <div
                     key={idx}
-                    className={`flex flex-col ${isMe ? "items-end" : "items-start"}`}
+                    className={`w-full flex ${isMe ? "justify-end" : "justify-start"}`}
                   >
-                    <div className="flex items-center gap-1.5 mb-0.5">
-                      <span className="text-[10px] text-gray-400 font-mono font-bold">
-                        {isMe ? "You" : m.sender}
-                      </span>
-                      <span className="text-[9px] text-gray-600 font-mono">{m.timestamp}</span>
-                    </div>
-                    <div
-                      className={`px-3 py-1.5 rounded-xl max-w-[85%] text-xs leading-relaxed ${
-                        isMe
-                          ? "bg-blue-600/30 text-blue-200 border border-blue-500/30"
-                          : "bg-white/10 text-gray-200 border border-white/10"
-                      }`}
-                    >
-                      {m.text}
+                    <div className={`flex flex-col max-w-[85%] ${isMe ? "items-end" : "items-start"}`}>
+                      <div className="flex items-center gap-1.5 mb-1 px-1">
+                        <span className={`text-[10px] font-mono font-bold ${isMe ? "text-orange-400" : "text-blue-400"}`}>
+                          {isMe ? "You" : m.sender}
+                        </span>
+                        <span className="text-[9px] text-gray-500 font-mono">{m.timestamp}</span>
+                      </div>
+                      <div
+                        className={`px-3.5 py-2 rounded-2xl text-xs leading-relaxed break-words shadow-md ${
+                          isMe
+                            ? "bg-gradient-to-r from-orange-500 to-amber-600 text-white rounded-tr-none font-medium"
+                            : "bg-[#16222f] text-gray-100 border border-white/10 rounded-tl-none font-medium"
+                        }`}
+                      >
+                        {m.text}
+                      </div>
                     </div>
                   </div>
                 );

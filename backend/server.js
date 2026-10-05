@@ -127,25 +127,98 @@ io.on('connection', (socket) => {
     socket.to(teamChannel).emit('peer-voice-left', { peerSocketId: socket.id });
   });
 
+  // Join Team Coordination Channel (Chat, Claims, Exit Votes)
+  socket.on('join-team-channel', ({ roomId, team, username }) => {
+    if (!roomId || !team) return;
+    const teamChannel = `${roomId}-team-${team}`;
+    socket.join(teamChannel);
+  });
+
   // Team Problem Claiming / Coordination (Divide and conquer)
   socket.on('team-claim-problem', ({ roomId, team, username, problemIndex, problemTitle }) => {
     const teamChannel = `${roomId}-team-${team}`;
     io.to(teamChannel).emit('team-problem-claimed', {
+      team,
       username,
       problemIndex,
       problemTitle,
       claimedAt: Date.now()
     });
+    // Also notify room so opponents or spectators can track progress
+    io.to(roomId).emit('room-problem-claimed', {
+      team,
+      username,
+      problemIndex,
+      problemTitle
+    });
   });
 
-  // Team Tactical Chat (Invisible to opposing squad)
+  // Pre-Battle Problem Lock-In (Player locks their chosen problem before match starts)
+  socket.on('player-lock-problem', ({ roomId, team, username, problemIndex, problemTitle }) => {
+    io.to(roomId).emit('player-problem-locked', {
+      team,
+      username,
+      problemIndex,
+      problemTitle
+    });
+  });
+
+  // Pre-Battle 5-Second Ready Countdown Trigger
+  socket.on('start-ready-countdown', ({ roomId }) => {
+    io.to(roomId).emit('battle-ready-countdown-start', {
+      countdownSeconds: 5
+    });
+  });
+
+  // Team Tactical Chat (Private to squad)
   socket.on('team-chat-message', ({ roomId, team, sender, text }) => {
     const teamChannel = `${roomId}-team-${team}`;
     io.to(teamChannel).emit('team-chat-received', {
+      team,
       sender,
       text,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     });
+  });
+
+  // Team Consensus Exit Voting (All teammates must accept for team to exit)
+  socket.on('team-exit-request', ({ roomId, team, requestedBy }) => {
+    const teamChannel = `${roomId}-team-${team}`;
+    io.to(teamChannel).emit('team-exit-requested', {
+      requestedBy,
+      team,
+      requestedAt: Date.now()
+    });
+  });
+
+  socket.on('team-exit-response', ({ roomId, team, respondent, accepted }) => {
+    const teamChannel = `${roomId}-team-${team}`;
+    if (!accepted) {
+      // If even ONE player rejects, the exit fails immediately!
+      io.to(teamChannel).emit('team-exit-cancelled', {
+        declinedBy: respondent,
+        reason: `${respondent} declined the exit request. Battle continues!`
+      });
+    } else {
+      // Player accepted the exit
+      io.to(teamChannel).emit('team-exit-voted', {
+        respondent,
+        accepted: true
+      });
+    }
+  });
+
+  socket.on('team-exit-cancel', ({ roomId, team, cancelledBy }) => {
+    const teamChannel = `${roomId}-team-${team}`;
+    io.to(teamChannel).emit('team-exit-cancelled', {
+      declinedBy: cancelledBy,
+      reason: `${cancelledBy} cancelled the exit request.`
+    });
+  });
+
+  socket.on('team-exit-confirmed', ({ roomId, team }) => {
+    const teamChannel = `${roomId}-team-${team}`;
+    io.to(teamChannel).emit('team-exit-execute', { team });
   });
 
   // Spectator & Opponent Live Cast Telemetry Broadcast

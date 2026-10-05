@@ -13,7 +13,11 @@ import {
   FaChevronLeft,
   FaChevronRight,
   FaBolt,
-  FaUsers
+  FaUsers,
+  FaUser,
+  FaLock,
+  FaHourglassHalf,
+  FaShieldAlt
 } from "react-icons/fa";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
@@ -125,6 +129,20 @@ const ContestPage = () => {
   // Team Problem Claiming State ({ [problemIndex]: claimedByUsername })
   const [teamClaims, setTeamClaims] = useState({});
 
+  // Pre-Battle Problem Selection & Ready Countdown States
+  const [isSelectionPhase, setIsSelectionPhase] = useState(() => {
+    return Boolean(isTeamMatch && battle?.status !== "finished");
+  });
+  const [readyCountdown, setReadyCountdown] = useState(null); // null or 5..0
+  const [lockedProblems, setLockedProblems] = useState({}); // { [username]: { team, problemIndex, problemTitle } }
+  const [isMyProblemLocked, setIsMyProblemLocked] = useState(false);
+  const readyCountdownTriggeredRef = useRef(false);
+
+  // Team Consensus Exit State
+  const [exitVoteInitiator, setExitVoteInitiator] = useState(null); // username of requester
+  const [isMyExitRequested, setIsMyExitRequested] = useState(false); // true if I requested
+  const [exitNotification, setExitNotification] = useState("");
+
   // Check if problem is solved
   const isProblemSolved = (prob) => {
     if (!prob) return false;
@@ -139,6 +157,16 @@ const ContestPage = () => {
   const mySolvedCount = problemsList.filter(isProblemSolved).length;
   const totalRequired = problemsList.length || 1;
   const opponentSolvedCount = opponentParticipant?.solvedProblems?.length || 0;
+
+  // Teammates in my team
+  const teammateParticipants = (battle?.participants || []).filter(
+    (p) =>
+      !p.isSpectator &&
+      (myTeam !== "solo" ? p.team === myTeam : false) &&
+      p.user !== myUsername &&
+      p.username !== myUsername &&
+      p.user?.username !== myUsername
+  );
 
   // Claim problem for team coordination
   const handleClaimProblem = (targetIndex) => {
@@ -157,6 +185,71 @@ const ContestPage = () => {
     }));
   };
 
+  // Odd/Even problem selection helpers for Pre-Battle
+  const handleSelectOdd = () => {
+    // 1-indexed odd: index 0 (Q1), index 2 (Q3)...
+    const oddIdx = problemsList.findIndex((p, idx) => {
+      if (idx % 2 !== 0) return false;
+      const claimed = Object.values(lockedProblems).find(l => l.team === myTeam && l.problemIndex === idx)?.username || teamClaims[idx];
+      return !claimed || claimed === myUsername;
+    });
+    if (oddIdx !== -1) {
+      setActiveProblemIndex(oddIdx);
+    }
+  };
+
+  const handleSelectEven = () => {
+    // 1-indexed even: index 1 (Q2), index 3 (Q4)...
+    const evenIdx = problemsList.findIndex((p, idx) => {
+      if (idx % 2 === 0) return false;
+      const claimed = Object.values(lockedProblems).find(l => l.team === myTeam && l.problemIndex === idx)?.username || teamClaims[idx];
+      return !claimed || claimed === myUsername;
+    });
+    if (evenIdx !== -1) {
+      setActiveProblemIndex(evenIdx);
+    }
+  };
+
+  // Lock In Selected Challenge
+  const handleLockInSelection = (idxToLock) => {
+    const targetIdx = idxToLock !== undefined ? idxToLock : safeActiveIndex;
+    setActiveProblemIndex(targetIdx);
+    setIsMyProblemLocked(true);
+    const prob = problemsList[targetIdx];
+    const pTitle = prob?.title || `Question ${targetIdx + 1}`;
+
+    setLockedProblems((prev) => ({
+      ...prev,
+      [myUsername]: {
+        team: myTeam,
+        problemIndex: targetIdx,
+        problemTitle: pTitle,
+        username: myUsername
+      }
+    }));
+    setTeamClaims((prev) => ({
+      ...prev,
+      [targetIdx]: myUsername
+    }));
+
+    if (socketRef.current) {
+      socketRef.current.emit("player-lock-problem", {
+        roomId: battle?.roomId || contestId,
+        team: myTeam,
+        username: myUsername,
+        problemIndex: targetIdx,
+        problemTitle: pTitle
+      });
+      socketRef.current.emit("team-claim-problem", {
+        roomId: battle?.roomId || contestId,
+        team: myTeam,
+        username: myUsername,
+        problemIndex: targetIdx,
+        problemTitle: pTitle
+      });
+    }
+  };
+
   // Automatically broadcast assigned problem claim on initial load for squad matches
   const hasAutoClaimedRef = useRef(false);
   useEffect(() => {
@@ -170,6 +263,42 @@ const ContestPage = () => {
       }
     }
   }, [battle, myParticipant, myTeam, problemsList.length]);
+
+  // Check if all combatants locked in during pre-battle phase to trigger 5s countdown
+  useEffect(() => {
+    if (!isTeamMatch || !isSelectionPhase || readyCountdown !== null) return;
+    const activeCombatants = (battle?.participants || []).filter(p => !p.isSpectator);
+    if (!activeCombatants.length) return;
+
+    const allLocked = activeCombatants.every(p => {
+      const uName = (p.user?.username || p.username || p.user || "").trim();
+      return lockedProblems[uName] || (uName === myUsername && isMyProblemLocked);
+    });
+
+    if (allLocked && socketRef.current && !readyCountdownTriggeredRef.current) {
+      readyCountdownTriggeredRef.current = true;
+      socketRef.current.emit("start-ready-countdown", {
+        roomId: battle?.roomId || contestId
+      });
+    }
+  }, [lockedProblems, isMyProblemLocked, isTeamMatch, isSelectionPhase, readyCountdown, battle?.participants, contestId, myUsername]);
+
+  // Ready countdown ticker (5..4..3..2..1 -> Arena Opens)
+  useEffect(() => {
+    if (readyCountdown === null) return;
+    if (readyCountdown > 0) {
+      const timer = setTimeout(() => {
+        setReadyCountdown(prev => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+      return () => clearTimeout(timer);
+    } else if (readyCountdown === 0) {
+      const timer = setTimeout(() => {
+        setIsSelectionPhase(false);
+        setReadyCountdown(null);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [readyCountdown]);
 
   // Handle switching between questions
   const handleSwitchProblem = (newIndex) => {
@@ -313,6 +442,64 @@ const ContestPage = () => {
     }
   }, [API, contestId, navigate, battle?.status, code, language, currentProblem, opponentDraftCode]);
 
+  // Squad Consensus Exit Click Handler
+  const handleExitClick = () => {
+    if (battle?.status === "finished") {
+      navigate(`/results/${contestId}`, {
+        state: { opponentDraftCode }
+      });
+      return;
+    }
+
+    if (isTeamMatch && myTeam !== "solo") {
+      if (
+        window.confirm(
+          "⚠️ Initiate Squad Exit Vote?\nAll teammates must accept for the squad to forfeit and exit."
+        )
+      ) {
+        setIsMyExitRequested(true);
+        if (socketRef.current) {
+          socketRef.current.emit("team-exit-request", {
+            roomId: battle?.roomId || contestId,
+            team: myTeam,
+            requestedBy: myUsername
+          });
+        }
+      }
+    } else {
+      handleExitBattle(false);
+    }
+  };
+
+  const handleRespondExitVote = (accepted) => {
+    if (socketRef.current) {
+      socketRef.current.emit("team-exit-response", {
+        roomId: battle?.roomId || contestId,
+        team: myTeam,
+        respondent: myUsername,
+        accepted
+      });
+      if (accepted) {
+        socketRef.current.emit("team-exit-confirmed", {
+          roomId: battle?.roomId || contestId,
+          team: myTeam
+        });
+      }
+    }
+    setExitVoteInitiator(null);
+  };
+
+  const handleCancelExitVote = () => {
+    if (socketRef.current) {
+      socketRef.current.emit("team-exit-cancel", {
+        roomId: battle?.roomId || contestId,
+        team: myTeam,
+        cancelledBy: myUsername
+      });
+    }
+    setIsMyExitRequested(false);
+  };
+
   // Strict Zero-Tolerance Proctoring
   const handleSecurityTermination = useCallback((reason) => {
     handleExitBattle(true);
@@ -394,6 +581,14 @@ const ContestPage = () => {
 
     socketRef.current.emit("join-room", contestId);
 
+    if (isTeamMatch && myTeam !== "solo") {
+      socketRef.current.emit("join-team-channel", {
+        roomId: contestId,
+        team: myTeam,
+        username: myUsername
+      });
+    }
+
     socketRef.current.on("battle-ended", (data) => {
       if (socketRef.current) {
         socketRef.current.emit("leave-room", contestId);
@@ -433,17 +628,58 @@ const ContestPage = () => {
       setDebugOutput((prev) => prev + `> 👥 [SQUAD COORD] ${username} claimed Challenge #${problemIndex + 1}: ${problemTitle || ""}\n`);
     });
 
+    socketRef.current.on("player-problem-locked", ({ team, username, problemIndex, problemTitle }) => {
+      setLockedProblems((prev) => ({
+        ...prev,
+        [username]: { team, problemIndex, problemTitle, username }
+      }));
+      setTeamClaims((prev) => ({
+        ...prev,
+        [problemIndex]: username
+      }));
+      setDebugOutput((prev) => prev + `> 🔒 [SELECTION] ${username} locked Challenge #${problemIndex + 1}: ${problemTitle || ""}\n`);
+    });
+
+    socketRef.current.on("battle-ready-countdown-start", ({ countdownSeconds = 5 }) => {
+      setReadyCountdown(countdownSeconds);
+    });
+
+    socketRef.current.on("team-exit-requested", ({ requestedBy, team }) => {
+      if (team === myTeam && requestedBy !== myUsername) {
+        setExitVoteInitiator(requestedBy);
+      }
+    });
+
+    socketRef.current.on("team-exit-voted", ({ respondent }) => {
+      setExitNotification(`✅ ${respondent} accepted the squad exit request.`);
+    });
+
+    socketRef.current.on("team-exit-cancelled", ({ declinedBy, reason }) => {
+      setExitVoteInitiator(null);
+      setIsMyExitRequested(false);
+      setExitNotification(reason || `❌ Exit request rejected by ${declinedBy}. Battle continues!`);
+      setTimeout(() => setExitNotification(""), 5000);
+    });
+
+    socketRef.current.on("team-exit-execute", ({ team }) => {
+      if (team === myTeam) {
+        setExitVoteInitiator(null);
+        setIsMyExitRequested(false);
+        handleExitBattle(true);
+      }
+    });
+
     return () => {
       if (socketRef.current) {
         socketRef.current.emit("leave-room", contestId);
         socketRef.current.disconnect();
       }
     };
-  }, [contestId, API, navigate, myUsername, fetchBattleStatus]);
+  }, [contestId, API, navigate, myUsername, fetchBattleStatus, isTeamMatch, myTeam, handleExitBattle]);
 
-  // Countdown timer for MY time only (Standard Contests only; Ranked duels are pure first-to-solve sprints)
+  // Countdown timer for MY time only (Standard Contests only; Ranked duels are sprints; paused during selection phase)
   useEffect(() => {
-    if (!battle || battle.status === "finished" || isRanked) return;
+    if (!battle || battle.status === "finished" || isRanked || isSelectionPhase) return;
     const t = setInterval(() => {
       setBattle((prev) => {
         if (!prev) return prev;
@@ -713,7 +949,7 @@ const ContestPage = () => {
       <nav className="w-full py-2.5 px-4 sm:px-6 md:px-8 bg-[#0a1118] border-b border-white/20 flex justify-between items-center shrink-0 z-40 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => handleExitBattle(false)}
+            onClick={handleExitClick}
             className="flex items-center gap-1.5 text-gray-300 hover:text-red-400 text-xs font-bold uppercase transition bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/30 hover:border-white cursor-pointer"
             title={battle?.status === "finished" ? "View Match Results" : "Exit Match"}
           >
@@ -730,14 +966,14 @@ const ContestPage = () => {
               ? "bg-orange-500/20 border border-orange-500/40 text-orange-300 font-bold"
               : "bg-white/5 border border-white/30 text-white"
           }`}>
-            {isRanked ? "Ranked 1v1 Duel" : "Contest Arena"}
+            {isRanked ? "Ranked 1v1 Duel" : (isTeamMatch ? `${battle?.battleType || "Squad"} Battle` : "Contest Arena")}
           </span>
         </div>
 
         {/* PROGRESS AND TIMER */}
         <div className="flex items-center gap-3">
-          {/* MULTI-QUESTION PROGRESS BADGE */}
-          {problemsList.length > 1 && (
+          {/* MULTI-QUESTION PROGRESS BADGE (SOLO / FFA ONLY) */}
+          {!isTeamMatch && problemsList.length > 1 && (
             <div className="hidden sm:flex items-center gap-2 bg-black/60 px-3.5 py-1.5 rounded-xl border border-white/30 shadow-[0_0_15px_rgba(255,255,255,0.08)] font-mono text-xs">
               <span className="text-gray-400">Arena Goal:</span>
               <span className="text-green-400 font-bold">{mySolvedCount}/{totalRequired} Solved</span>
@@ -777,6 +1013,14 @@ const ContestPage = () => {
             </div>
           )}
 
+          {/* LOGGED IN USERNAME BADGE */}
+          <div className="flex items-center gap-2 bg-white/5 border border-white/20 px-3 py-1.5 rounded-xl font-mono text-xs shadow-sm">
+            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+            <FaUser className="text-orange-400 text-xs" />
+            <span className="text-gray-400 hidden sm:inline">User:</span>
+            <span className="text-white font-bold tracking-wide">{myUsername}</span>
+          </div>
+
           {/* SQUAD TEAM VOICE & TACTICAL CHAT (IF TEAM MATCH) */}
           {(myTeam !== "solo" || isTeamMatch) && (
             <TeamVoiceComms
@@ -789,127 +1033,417 @@ const ContestPage = () => {
         </div>
       </nav>
 
-      {/* UNIQUE MULTI-QUESTION COMMAND BAR (NO SLIDEBAR/SCROLLBAR) */}
-      {problemsList.length > 1 && (
-        <div className="w-full bg-[#050b10] border-b border-white/20 px-4 sm:px-6 md:px-8 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 z-30 shadow-md">
-          {/* LEFT: STEPPERS & CHALLENGE CAPSULES */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold hidden sm:inline">
-              Challenges:
-            </span>
+      {/* TEAM EXIT VOTE NOTIFICATION TOAST */}
+      {exitNotification && (
+        <div className="bg-red-950/90 border-b border-red-500/50 text-red-200 px-6 py-2.5 text-xs flex items-center justify-between z-50 font-mono">
+          <span>{exitNotification}</span>
+          <button onClick={() => setExitNotification("")} className="text-red-400 hover:text-white font-bold ml-4">
+            ✕
+          </button>
+        </div>
+      )}
 
-            {/* PREV BUTTON */}
+      {/* TEAM EXIT REQUEST INITIATOR MODAL (WAITING FOR SQUAD CONSENSUS) */}
+      {isMyExitRequested && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0a1118] border-2 border-orange-500/50 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl animate-in zoom-in-95">
+            <div className="w-12 h-12 border-4 border-orange-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2">
+              Waiting for Squad Consensus
+            </h3>
+            <p className="text-xs text-gray-300 mb-6 font-mono leading-relaxed">
+              Your exit/forfeit vote has been sent to your teammates. All squad members must accept for the team to exit. If any teammate declines, combat continues!
+            </p>
             <button
-              onClick={() => handleSwitchProblem(safeActiveIndex - 1)}
-              disabled={safeActiveIndex === 0}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1 border ${
-                safeActiveIndex === 0
-                  ? "bg-white/5 border-white/10 text-gray-600 cursor-not-allowed"
-                  : "bg-white/10 border-white/30 text-white hover:bg-orange-500 hover:text-black hover:border-orange-500 cursor-pointer"
-              }`}
-              title="Previous Question"
+              onClick={handleCancelExitVote}
+              className="px-6 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
             >
-              <FaChevronLeft size={10} /> Prev
-            </button>
-
-            {/* QUESTION CAPSULES (WRAPPED, NO HORIZONTAL SCROLLBAR / SLIDEBAR) */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {problemsList.map((prob, idx) => {
-                const solved = isProblemSolved(prob);
-                const isActive = idx === safeActiveIndex;
-                const diff = prob.difficulty || "medium";
-                const diffDot =
-                  diff === "easy"
-                    ? "bg-emerald-400"
-                    : diff === "medium"
-                    ? "bg-amber-400"
-                    : "bg-rose-500";
-
-                return (
-                  <button
-                    key={prob._id || idx}
-                    onClick={() => handleSwitchProblem(idx)}
-                    className={`px-3 py-1 rounded-lg text-xs font-mono font-bold tracking-wide transition-all flex items-center gap-1.5 border cursor-pointer ${
-                      isActive
-                        ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black border-white shadow-[0_0_15px_rgba(249,115,22,0.6)] font-black scale-105"
-                        : solved
-                        ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25"
-                        : "bg-white/5 text-gray-300 border-white/20 hover:bg-white/10 hover:border-white/50"
-                    }`}
-                  >
-                    <span className={`w-2 h-2 rounded-full ${diffDot} shrink-0`}></span>
-                    <span>Q{idx + 1}</span>
-                    {solved ? (
-                      <FaCheckCircle className="text-emerald-400 text-xs shrink-0" />
-                    ) : (
-                      <span className="text-[10px] opacity-60 capitalize font-sans">{diff}</span>
-                    )}
-
-                    {/* SQUAD TEAM CLAIM BADGE */}
-                    {myTeam !== "solo" && teamClaims[idx] && (
-                      <span
-                        className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold tracking-tight uppercase flex items-center gap-1 ${
-                          teamClaims[idx] === myUsername
-                            ? "bg-black/60 text-orange-400 border border-orange-400/50"
-                            : "bg-blue-500/30 text-blue-200 border border-blue-400/40"
-                        }`}
-                        title={`${teamClaims[idx]} is solving Q${idx + 1}`}
-                      >
-                        <FaUsers size={8} />
-                        <span>{teamClaims[idx] === myUsername ? "You" : teamClaims[idx]}</span>
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* NEXT BUTTON */}
-            <button
-              onClick={() => handleSwitchProblem(safeActiveIndex + 1)}
-              disabled={safeActiveIndex >= problemsList.length - 1}
-              className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1 border ${
-                safeActiveIndex >= problemsList.length - 1
-                  ? "bg-white/5 border-white/10 text-gray-600 cursor-not-allowed"
-                  : "bg-white/10 border-white/30 text-white hover:bg-orange-500 hover:text-black hover:border-orange-500 cursor-pointer"
-              }`}
-              title="Next Question"
-            >
-              Next <FaChevronRight size={10} />
+              Cancel Request & Keep Fighting
             </button>
           </div>
+        </div>
+      )}
 
-          {/* RIGHT: QUICK SELECT DROPDOWN & PROGRESS */}
-          <div className="flex items-center gap-3 ml-auto">
-            {/* QUICK JUMP DROPDOWN */}
-            <div className="relative flex items-center">
-              <select
-                value={safeActiveIndex}
-                onChange={(e) => handleSwitchProblem(Number(e.target.value))}
-                aria-label="Quick jump to problem challenge"
-                className="bg-[#0a1118] border border-white/30 hover:border-white/60 text-white text-xs font-mono rounded-lg px-2.5 py-1 outline-none cursor-pointer pr-6 appearance-none transition"
+      {/* TEAM EXIT REQUEST RESPONDENT MODAL (ACCEPT OR DECLINE) */}
+      {exitVoteInitiator && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4">
+          <div className="bg-[#0a1118] border-2 border-red-500/50 rounded-2xl max-w-md w-full p-6 text-center shadow-2xl animate-in zoom-in-95">
+            <FaExclamationTriangle className="text-red-400 text-4xl mx-auto mb-3 animate-pulse" />
+            <h3 className="text-lg font-black text-white uppercase tracking-wider mb-2">
+              Squad Exit Request
+            </h3>
+            <p className="text-xs text-gray-300 mb-6 font-mono leading-relaxed">
+              Operative <span className="text-orange-400 font-bold">{exitVoteInitiator}</span> has initiated a squad surrender/exit vote.
+              <br /><br />
+              Do you agree to surrender and exit to results review? If you decline, the match continues!
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleRespondExitVote(false)}
+                className="flex-1 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
               >
-                {problemsList.map((prob, idx) => (
-                  <option key={prob._id || idx} value={idx} className="bg-[#0a1118] text-white">
-                    {`Challenge ${idx + 1}: ${prob.title || `Question ${idx + 1}`} ${isProblemSolved(prob) ? "✓ Solved" : ""}`}
-                  </option>
-                ))}
-              </select>
-              <span className="absolute right-2 pointer-events-none text-gray-400 text-[10px]">▼</span>
+                Decline & Keep Fighting
+              </button>
+              <button
+                onClick={() => handleRespondExitVote(true)}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs uppercase tracking-wider transition cursor-pointer"
+              >
+                Accept & Exit
+              </button>
             </div>
+          </div>
+        </div>
+      )}
 
-            {/* PROGRESS STATUS PILL */}
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-[11px] font-mono text-orange-300">
-              <span className="font-bold text-white">
-                {mySolvedCount}/{totalRequired} Solved
-              </span>
-              <span className="text-gray-500">•</span>
-              <span className="text-emerald-400 font-semibold tracking-wide">
-                {mySolvedCount === totalRequired ? "All Solved! 🏆" : `${totalRequired - mySolvedCount} Remaining`}
+      {/* 5-SECOND READY COUNTDOWN SCREEN */}
+      {readyCountdown !== null && (
+        <div className="fixed inset-0 z-50 bg-[#050b10]/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 select-none">
+          <div className="text-center">
+            <span className="text-xs font-mono font-bold uppercase tracking-widest text-orange-400 animate-pulse block mb-4">
+              ⚔️ ALL COMBATANTS READY • BATTLE COMMENCING IN
+            </span>
+            <div className="text-8xl sm:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-orange-400 to-red-500 animate-bounce">
+              {readyCountdown === 0 ? "GO!" : readyCountdown}
+            </div>
+            <div className="mt-8 p-4 rounded-2xl bg-white/5 border border-white/20 max-w-sm mx-auto">
+              <span className="text-xs text-gray-400 block font-mono mb-1">Your Designated Challenge:</span>
+              <span className="text-sm font-black text-white">
+                Challenge #{safeActiveIndex + 1}: {currentProblem?.title || `Question ${safeActiveIndex + 1}`}
               </span>
             </div>
           </div>
         </div>
+      )}
+
+      {/* PRE-BATTLE PROBLEM CLAIMING / SELECTION SCREEN */}
+      {isTeamMatch && myTeam !== "solo" && isSelectionPhase && readyCountdown === null && (
+        <div className="fixed inset-0 z-50 bg-[#050b10]/90 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto custom-scrollbar">
+          <div className="max-w-3xl w-full bg-[#0a1118] border-2 border-orange-500/50 rounded-2xl p-6 sm:p-8 shadow-2xl animate-in zoom-in-95">
+            {/* HEADER */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-white/10">
+              <div>
+                <span className="text-xs font-mono uppercase tracking-widest text-orange-400 font-bold block mb-1">
+                  Team Coordination Directive
+                </span>
+                <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
+                  Tactical Challenge Assignment
+                </h2>
+                <p className="text-xs text-gray-400 mt-1 font-mono">
+                  Each operative must claim their designated mission objective before combat begins.
+                </p>
+              </div>
+
+              {/* QUICK ODD / EVEN BUTTONS */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleSelectOdd}
+                  disabled={isMyProblemLocked}
+                  className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 border border-blue-400/30 text-xs font-mono font-bold transition cursor-pointer disabled:opacity-50"
+                  title="Claim Odd numbered challenge (Q1, Q3...)"
+                >
+                  Pick Odd (Q1, Q3)
+                </button>
+                <button
+                  onClick={handleSelectEven}
+                  disabled={isMyProblemLocked}
+                  className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 border border-purple-400/30 text-xs font-mono font-bold transition cursor-pointer disabled:opacity-50"
+                  title="Claim Even numbered challenge (Q2, Q4...)"
+                >
+                  Pick Even (Q2, Q4)
+                </button>
+              </div>
+            </div>
+
+            {/* PROBLEM SELECTION CARDS */}
+            <div className="py-6">
+              <span className="text-xs font-mono uppercase text-gray-400 font-bold block mb-3">
+                Available Combat Challenges:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {problemsList.map((prob, idx) => {
+                  const isSelectedByMe = idx === safeActiveIndex;
+                  const claimedBySquadMate = Object.values(lockedProblems).find(
+                    (l) => l.team === myTeam && l.problemIndex === idx && l.username !== myUsername
+                  )?.username || (teamClaims[idx] && teamClaims[idx] !== myUsername ? teamClaims[idx] : null);
+
+                  const diff = prob?.difficulty || "medium";
+                  const diffColor =
+                    diff === "easy"
+                      ? "text-green-400 border-green-500/40 bg-green-500/10"
+                      : diff === "medium"
+                      ? "text-yellow-400 border-yellow-500/40 bg-yellow-500/10"
+                      : "text-red-400 border-red-500/40 bg-red-500/10";
+
+                  return (
+                    <div
+                      key={prob?._id || idx}
+                      onClick={() => {
+                        if (!isMyProblemLocked && !claimedBySquadMate) {
+                          setActiveProblemIndex(idx);
+                        }
+                      }}
+                      className={`p-4 rounded-xl border-2 transition relative flex flex-col justify-between ${
+                        claimedBySquadMate
+                          ? "bg-white/5 border-white/10 opacity-50 cursor-not-allowed"
+                          : isSelectedByMe
+                          ? "bg-orange-500/15 border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.2)] cursor-pointer"
+                          : "bg-white/5 border-white/20 hover:border-white/50 cursor-pointer"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span className="text-xs font-mono font-bold text-gray-400">
+                          {idx % 2 === 0 ? "Odd Question" : "Even Question"} • Q{idx + 1}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold border ${diffColor}`}>
+                          {diff}
+                        </span>
+                      </div>
+
+                      <h4 className="text-sm font-bold text-white mb-3">
+                        {prob?.title || `Classified Question ${idx + 1}`}
+                      </h4>
+
+                      <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] font-mono">
+                        {claimedBySquadMate ? (
+                          <span className="text-blue-300 font-bold flex items-center gap-1">
+                            <FaLock size={10} /> Claimed by {claimedBySquadMate}
+                          </span>
+                        ) : isSelectedByMe ? (
+                          <span className="text-orange-400 font-bold flex items-center gap-1">
+                            {isMyProblemLocked ? "✓ Locked By You" : "Selected (Click Lock In)"}
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">Click to Select</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* SQUAD ROSTER LOCK-IN STATUS */}
+            <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-6">
+              <span className="text-[11px] font-mono uppercase text-gray-400 font-bold block mb-2">
+                Team {myTeam} Operatives Status:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
+                {/* MY STATUS */}
+                <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10">
+                  <span className="font-bold text-white">👤 You ({myUsername}):</span>
+                  {isMyProblemLocked ? (
+                    <span className="text-emerald-400 font-bold flex items-center gap-1">
+                      <FaCheckCircle size={11} /> Locked Q{safeActiveIndex + 1}
+                    </span>
+                  ) : (
+                    <span className="text-amber-400 font-semibold flex items-center gap-1 animate-pulse">
+                      <FaHourglassHalf size={11} /> Selecting...
+                    </span>
+                  )}
+                </div>
+
+                {/* TEAMMATES STATUS */}
+                {teammateParticipants.map((tp, idx) => {
+                  const tName = tp.user?.username || tp.username || tp.user || "Teammate";
+                  const lockEntry = lockedProblems[tName];
+                  return (
+                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10">
+                      <span className="text-gray-300 font-bold">👥 {tName}:</span>
+                      {lockEntry ? (
+                        <span className="text-emerald-400 font-bold flex items-center gap-1">
+                          <FaCheckCircle size={11} /> Locked Q{lockEntry.problemIndex + 1}
+                        </span>
+                      ) : (
+                        <span className="text-amber-400 font-semibold flex items-center gap-1 animate-pulse">
+                          <FaHourglassHalf size={11} /> Choosing...
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* CONFIRM / LOCK-IN BUTTON */}
+            <div className="flex flex-col sm:flex-row gap-3">
+              {!isMyProblemLocked ? (
+                <button
+                  onClick={() => handleLockInSelection(safeActiveIndex)}
+                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-wider transition shadow-lg shadow-orange-500/20 cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <FaLock /> Lock In Challenge #{safeActiveIndex + 1}
+                </button>
+              ) : (
+                <div className="flex-1 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs uppercase tracking-wider text-center flex items-center justify-center gap-2">
+                  <FaCheckCircle className="animate-spin text-sm" /> Challenge Locked In — Awaiting other operatives...
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SQUAD MISSION COMMAND BAR: ONLY SELECTED PROBLEM SHOWN TO EACH PLAYER */}
+      {isTeamMatch && myTeam !== "solo" ? (
+        <div className="w-full bg-[#050b10] border-b border-blue-500/30 px-4 sm:px-6 md:px-8 py-2.5 flex flex-wrap items-center justify-between gap-3 shrink-0 z-30 shadow-md">
+          {/* LEFT: MY ASSIGNED MISSION */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-2 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/40 text-xs font-mono">
+              <span className="w-2 h-2 rounded-full bg-orange-400 animate-pulse"></span>
+              <span className="text-gray-400 font-bold uppercase tracking-wider">Your Assigned Mission:</span>
+              <span className="text-white font-black text-sm">
+                Challenge #{safeActiveIndex + 1}: {currentProblem?.title || `Question ${safeActiveIndex + 1}`}
+              </span>
+              <span className={`px-2 py-0.5 rounded text-[10px] uppercase font-bold border ml-1 ${
+                currentProblem?.difficulty === "easy"
+                  ? "bg-green-500/10 border-green-500/40 text-green-400"
+                  : currentProblem?.difficulty === "medium"
+                  ? "bg-yellow-500/10 border-yellow-500/40 text-yellow-400"
+                  : "bg-red-500/10 border-red-500/40 text-red-400"
+              }`}>
+                {currentProblem?.difficulty || "Medium"}
+              </span>
+            </div>
+
+            {isProblemSolved(currentProblem) && (
+              <span className="flex items-center gap-1.5 text-emerald-400 text-xs font-bold font-mono bg-emerald-500/10 px-3 py-1 rounded-lg border border-emerald-500/30">
+                <FaCheckCircle /> Objective Completed!
+              </span>
+            )}
+          </div>
+
+          {/* RIGHT: TEAMMATES AND RIVALS STATUS OVERVIEW */}
+          <div className="flex items-center gap-3 ml-auto flex-wrap">
+            {teammateParticipants.map((tp, idx) => {
+              const tUsername = tp.user?.username || tp.username || tp.user || "Teammate";
+              const tAssigned = tp.assignedProblemIndex !== undefined ? tp.assignedProblemIndex : (safeActiveIndex === 0 ? 1 : 0);
+              const tProb = problemsList[tAssigned];
+              const tSolved = tp.solvedProblems?.some(sp => (sp?._id || sp)?.toString() === (tProb?._id || "").toString());
+              return (
+                <div key={idx} className="flex items-center gap-2 bg-blue-950/40 border border-blue-500/30 px-3 py-1 rounded-xl text-xs font-mono">
+                  <FaUsers className="text-blue-400 text-xs" />
+                  <span className="text-gray-300 font-bold">{tUsername}:</span>
+                  <span className="text-blue-300">Q{tAssigned + 1}</span>
+                  <span className={tSolved ? "text-emerald-400 font-bold" : "text-amber-400 font-semibold"}>
+                    {tSolved ? "✓ Solved" : "Solving..."}
+                  </span>
+                </div>
+              );
+            })}
+
+            {/* TEAM SOLVED TOTAL PILL */}
+            <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs font-mono text-orange-300">
+              <span className="text-gray-400">Squad Goal:</span>
+              <span className="font-bold text-white">{mySolvedCount}/{totalRequired} Solved</span>
+            </div>
+          </div>
+        </div>
+      ) : (
+        /* SOLO / FFA MULTI-QUESTION COMMAND BAR */
+        problemsList.length > 1 && (
+          <div className="w-full bg-[#050b10] border-b border-white/20 px-4 sm:px-6 md:px-8 py-2 flex flex-wrap items-center justify-between gap-3 shrink-0 z-30 shadow-md">
+            {/* LEFT: STEPPERS & CHALLENGE CAPSULES */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[10px] font-mono uppercase tracking-widest text-gray-400 font-bold hidden sm:inline">
+                Challenges:
+              </span>
+
+              {/* PREV BUTTON */}
+              <button
+                onClick={() => handleSwitchProblem(safeActiveIndex - 1)}
+                disabled={safeActiveIndex === 0}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1 border ${
+                  safeActiveIndex === 0
+                    ? "bg-white/5 border-white/10 text-gray-600 cursor-not-allowed"
+                    : "bg-white/10 border-white/30 text-white hover:bg-orange-500 hover:text-black hover:border-orange-500 cursor-pointer"
+                }`}
+                title="Previous Question"
+              >
+                <FaChevronLeft size={10} /> Prev
+              </button>
+
+              {/* QUESTION CAPSULES */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {problemsList.map((prob, idx) => {
+                  const solved = isProblemSolved(prob);
+                  const isActive = idx === safeActiveIndex;
+                  const diff = prob.difficulty || "medium";
+                  const diffDot =
+                    diff === "easy"
+                      ? "bg-emerald-400"
+                      : diff === "medium"
+                      ? "bg-amber-400"
+                      : "bg-rose-500";
+
+                  return (
+                    <button
+                      key={prob._id || idx}
+                      onClick={() => handleSwitchProblem(idx)}
+                      className={`px-3 py-1 rounded-lg text-xs font-mono font-bold tracking-wide transition-all flex items-center gap-1.5 border cursor-pointer ${
+                        isActive
+                          ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black border-white shadow-[0_0_15px_rgba(249,115,22,0.6)] font-black scale-105"
+                          : solved
+                          ? "bg-emerald-500/15 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/25"
+                          : "bg-white/5 text-gray-300 border-white/20 hover:bg-white/10 hover:border-white/50"
+                      }`}
+                    >
+                      <span className={`w-2 h-2 rounded-full ${diffDot} shrink-0`}></span>
+                      <span>Q{idx + 1}</span>
+                      {solved ? (
+                        <FaCheckCircle className="text-emerald-400 text-xs shrink-0" />
+                      ) : (
+                        <span className="text-[10px] opacity-60 capitalize font-sans">{diff}</span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* NEXT BUTTON */}
+              <button
+                onClick={() => handleSwitchProblem(safeActiveIndex + 1)}
+                disabled={safeActiveIndex >= problemsList.length - 1}
+                className={`px-2.5 py-1 rounded-lg text-xs font-bold font-mono transition flex items-center gap-1 border ${
+                  safeActiveIndex >= problemsList.length - 1
+                    ? "bg-white/5 border-white/10 text-gray-600 cursor-not-allowed"
+                    : "bg-white/10 border-white/30 text-white hover:bg-orange-500 hover:text-black hover:border-orange-500 cursor-pointer"
+                }`}
+                title="Next Question"
+              >
+                Next <FaChevronRight size={10} />
+              </button>
+            </div>
+
+            {/* RIGHT: QUICK SELECT DROPDOWN & PROGRESS */}
+            <div className="flex items-center gap-3 ml-auto">
+              <div className="relative flex items-center">
+                <select
+                  value={safeActiveIndex}
+                  onChange={(e) => handleSwitchProblem(Number(e.target.value))}
+                  aria-label="Quick jump to problem challenge"
+                  className="bg-[#0a1118] border border-white/30 hover:border-white/60 text-white text-xs font-mono rounded-lg px-2.5 py-1 outline-none cursor-pointer pr-6 appearance-none transition"
+                >
+                  {problemsList.map((prob, idx) => (
+                    <option key={prob._id || idx} value={idx} className="bg-[#0a1118] text-white">
+                      {`Challenge ${idx + 1}: ${prob.title || `Question ${idx + 1}`} ${isProblemSolved(prob) ? "✓ Solved" : ""}`}
+                    </option>
+                  ))}
+                </select>
+                <span className="absolute right-2 pointer-events-none text-gray-400 text-[10px]">▼</span>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-orange-500/10 border border-orange-500/30 text-[11px] font-mono text-orange-300">
+                <span className="font-bold text-white">
+                  {mySolvedCount}/{totalRequired} Solved
+                </span>
+                <span className="text-gray-500">•</span>
+                <span className="text-emerald-400 font-semibold tracking-wide">
+                  {mySolvedCount === totalRequired ? "All Solved! 🏆" : `${totalRequired - mySolvedCount} Remaining`}
+                </span>
+              </div>
+            </div>
+          </div>
+        )
       )}
 
       {/* MAIN COMBAT ARENA - RESIZABLE SPLIT LAYOUT WITH INDEPENDENT SCROLL */}
@@ -978,9 +1512,13 @@ const ContestPage = () => {
             )}
 
             {isProblemSolved(currentProblem) && (
-              <div className="mb-4 px-3.5 py-2 rounded-xl bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-bold flex items-center gap-2">
+              <div className="mb-4 px-3.5 py-2.5 rounded-xl bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-bold flex items-center gap-2">
                 <FaCheckCircle className="text-green-400 text-sm shrink-0" />
-                <span>You have solved this challenge! Choose another question tab above to solve all and claim victory.</span>
+                <span>
+                  {myTeam !== "solo"
+                    ? "🎉 You have completed your assigned challenge objective! Awaiting your teammates to finish their challenges to secure squad victory."
+                    : "You have solved this challenge! Choose another question tab above to solve all and claim victory."}
+                </span>
               </div>
             )}
 
