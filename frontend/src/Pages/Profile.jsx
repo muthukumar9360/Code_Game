@@ -214,7 +214,7 @@ const Profile = () => {
             }`}
           >
             <FaCode />
-            <span>Solved Questions & Code ({submissionHistory.solvedProblems?.length || 0})</span>
+            <span>Practice Submissions & Code ({(submissionHistory.recentSubmissions || []).filter(s => !s.isBattle && !s.isDailyChallenge && s.source !== "competitive" && s.source !== "daily").length})</span>
           </button>
 
           <button
@@ -240,11 +240,12 @@ const Profile = () => {
           />
         )}
 
-        {/* TAB 2: SOLVED QUESTIONS & SUBMISSION CODE HISTORY */}
+        {/* TAB 2: PRACTICE QUESTIONS & SUBMISSION CODE HISTORY */}
         {activeProfileTab === "solved" && (
           <div>
             <SolvedHistoryViewer
               solvedProblems={submissionHistory.solvedProblems || []}
+              attemptedProblems={submissionHistory.attemptedProblems || []}
               recentSubmissions={submissionHistory.recentSubmissions || []}
               loading={historyLoading}
             />

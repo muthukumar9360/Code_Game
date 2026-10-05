@@ -11,24 +11,19 @@ import {
   FaExternalLinkAlt,
   FaTimes,
   FaHistory,
-  FaFilter,
-  FaBrain,
-  FaMedal,
-  FaTrophy,
-  FaBolt,
-  FaGamepad
+  FaBrain
 } from "react-icons/fa";
 
 const SolvedHistoryViewer = ({
   solvedProblems = [],
+  attemptedProblems = [],
   recentSubmissions = [],
   loading = false
 }) => {
-  const [activeTab, setActiveTab] = useState("all"); // 'all' | 'solved' | 'competitive'
+  const [activeTab, setActiveTab] = useState("all"); // 'all' | 'solved' | 'attempted'
   const [searchQuery, setSearchQuery] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'accepted' | 'failed'
-  const [sourceFilter, setSourceFilter] = useState("all"); // 'all' | 'practice' | 'competitive' | 'daily'
   const [selectedSolution, setSelectedSolution] = useState(null);
   const [copied, setCopied] = useState(false);
 
@@ -89,20 +84,48 @@ const SolvedHistoryViewer = ({
     );
   };
 
+  // Strictly isolate practice mode submissions (exclude competitive battles and daily challenge)
+  const practiceSubmissions = (recentSubmissions || []).filter(
+    (s) => !s.isBattle && !s.isDailyChallenge && s.source !== "competitive" && s.source !== "daily"
+  );
+
+  const practiceSolved = (solvedProblems || []).filter(
+    (s) => !s.isBattle && !s.isDailyChallenge
+  );
+
+  const practiceAttempted = (attemptedProblems || []).filter(
+    (s) => !s.isBattle && !s.isDailyChallenge
+  );
+
+  const solvedList = practiceSolved.length > 0
+    ? practiceSolved
+    : practiceSubmissions.filter((s) => {
+        const res = (s.overallResult || "").toLowerCase();
+        return res === "accepted" || res === "passed";
+      });
+
+  const attemptedList = practiceAttempted.length > 0
+    ? practiceAttempted
+    : practiceSubmissions.filter((s) => {
+        const res = (s.overallResult || "").toLowerCase();
+        return res !== "accepted" && res !== "passed";
+      });
+
   // Base list depending on activeTab
   const getBaseItems = () => {
     if (activeTab === "solved") {
-      return solvedProblems;
+      return solvedList;
     }
-    if (activeTab === "competitive") {
-      return recentSubmissions.filter((s) => s.isBattle || s.source === "competitive");
+    if (activeTab === "attempted") {
+      return attemptedList;
     }
-    return recentSubmissions;
+    // "all" tab contains all practice submissions (both solved and submitted/attempted)
+    return practiceSubmissions;
   };
 
   const baseItems = getBaseItems();
 
-  // Multi-facet filter
+  // Multi-facet filter (search by title/language, difficulty filter, verdict status filter)
   const filteredItems = baseItems.filter((item) => {
     const title = (item.title || item.problemTitle || "").toLowerCase();
     const lang = (item.language || "").toLowerCase();
@@ -111,8 +134,7 @@ const SolvedHistoryViewer = ({
     const matchesSearch =
       !query ||
       title.includes(query) ||
-      lang.includes(query) ||
-      (item.battleRoomId || "").toLowerCase().includes(query);
+      lang.includes(query);
 
     const matchesDiff =
       difficultyFilter === "all" ||
@@ -127,20 +149,8 @@ const SolvedHistoryViewer = ({
       (statusFilter === "accepted" && isAccepted) ||
       (statusFilter === "failed" && !isAccepted);
 
-    const isBattle = Boolean(item.isBattle || item.source === "competitive");
-    const isDaily = Boolean(item.isDailyChallenge || item.source === "daily");
-    const isPractice = !isBattle && !isDaily;
-
-    const matchesSource =
-      sourceFilter === "all" ||
-      (sourceFilter === "practice" && isPractice) ||
-      (sourceFilter === "competitive" && isBattle) ||
-      (sourceFilter === "daily" && isDaily);
-
-    return matchesSearch && matchesDiff && matchesStatus && matchesSource;
+    return matchesSearch && matchesDiff && matchesStatus;
   });
-
-  const competitiveCount = recentSubmissions.filter((s) => s.isBattle || s.source === "competitive").length;
 
   return (
     <div className="bg-[#0a1118] border-2 border-white/40 rounded-3xl p-6 shadow-2xl relative overflow-hidden">
@@ -149,17 +159,17 @@ const SolvedHistoryViewer = ({
         <div>
           <div className="flex items-center gap-2 text-xs font-mono uppercase tracking-widest text-orange-400 font-bold mb-1">
             <FaHistory />
-            <span>Submission Registry & Code Inspector</span>
+            <span>Practice Mode Submission Registry</span>
           </div>
           <h2 className="text-2xl font-black text-white tracking-tight">
-            Submission History & Code Archive
+            Practice Submissions & Source Code
           </h2>
           <p className="text-xs text-gray-400 font-mono mt-1">
-            Inspect all practice directives, competitive match attempts, and solved algorithms with full source code history
+            Inspect all practice problem directives, solved algorithms, and code submissions with full historical source code
           </p>
         </div>
 
-        {/* TAB TOGGLES */}
+        {/* TAB TOGGLES: ALL (SOLVED & SUBMITTED), SOLVED, ATTEMPTED */}
         <div className="flex flex-wrap items-center gap-1.5 p-1.5 bg-black/60 border border-white/30 rounded-2xl shrink-0 self-start md:self-auto">
           <button
             onClick={() => setActiveTab("all")}
@@ -170,7 +180,7 @@ const SolvedHistoryViewer = ({
             }`}
           >
             <FaHistory size={12} />
-            <span>All Submissions ({recentSubmissions.length})</span>
+            <span>All Submissions ({practiceSubmissions.length})</span>
           </button>
 
           <button
@@ -182,19 +192,19 @@ const SolvedHistoryViewer = ({
             }`}
           >
             <FaCheckCircle size={12} />
-            <span>Solved Problems ({solvedProblems.length})</span>
+            <span>Solved ({solvedList.length})</span>
           </button>
 
           <button
-            onClick={() => setActiveTab("competitive")}
+            onClick={() => setActiveTab("attempted")}
             className={`px-3.5 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 ${
-              activeTab === "competitive"
+              activeTab === "attempted"
                 ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black shadow-lg"
                 : "text-gray-300 hover:text-white"
             }`}
           >
-            <FaGamepad size={12} />
-            <span>Competitive Arena ({competitiveCount})</span>
+            <FaTimesCircle size={12} />
+            <span>Attempted / Wrong ({attemptedList.length})</span>
           </button>
         </div>
       </div>
@@ -206,7 +216,7 @@ const SolvedHistoryViewer = ({
           <FaSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs" />
           <input
             type="text"
-            placeholder="Search by problem title, language, or room ID..."
+            placeholder="Search practice code by problem title or language..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full pl-9 pr-4 py-2 bg-black/50 border border-white/30 rounded-xl text-xs text-white placeholder-gray-400 outline-none focus:border-white transition font-mono"
@@ -215,22 +225,7 @@ const SolvedHistoryViewer = ({
 
         {/* FACET FILTERS */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* SOURCE SELECTOR */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono text-gray-300 shrink-0">Type:</span>
-            <select
-              value={sourceFilter}
-              onChange={(e) => setSourceFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-black/60 border border-white/30 rounded-xl text-xs font-mono text-white outline-none focus:border-white transition"
-            >
-              <option value="all">All Sources</option>
-              <option value="practice">Solo Practice</option>
-              <option value="competitive">Competitive Battles</option>
-              <option value="daily">Daily Blitz</option>
-            </select>
-          </div>
-
-          {/* STATUS SELECTOR */}
+          {/* VERDICT STATUS SELECTOR */}
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-mono text-gray-300 shrink-0">Verdict:</span>
             <select
@@ -284,9 +279,6 @@ const SolvedHistoryViewer = ({
             const submittedAt = item.solvedAt || item.submittedAt;
             const lang = item.language || "python";
 
-            const isBattle = Boolean(item.isBattle || item.source === "competitive");
-            const isDaily = Boolean(item.isDailyChallenge || item.source === "daily");
-
             return (
               <div
                 key={item.id || item.submissionId || idx}
@@ -296,11 +288,11 @@ const SolvedHistoryViewer = ({
                 <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
                   <div className="pt-0.5 sm:pt-0">
                     {isAccepted ? (
-                      <div className="w-8 h-8 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-400 shadow-sm" title="Accepted Solution">
+                      <div className="w-8 h-8 rounded-xl bg-green-500/10 border border-green-500/30 flex items-center justify-center text-green-400 shadow-sm" title="Accepted Practice Solution">
                         <FaCheckCircle size={14} />
                       </div>
                     ) : (
-                      <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shadow-sm" title="Attempted (Failed Testcases)">
+                      <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-400 shadow-sm" title="Attempted Practice (Failed Testcases)">
                         <FaTimesCircle size={14} />
                       </div>
                     )}
@@ -325,26 +317,10 @@ const SolvedHistoryViewer = ({
 
                       {getDifficultyBadge(item.difficulty)}
 
-                      {/* SOURCE BADGE */}
-                      {isBattle && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-purple-500/15 text-purple-300 border border-purple-500/30 flex items-center gap-1">
-                          <FaGamepad size={9} />
-                          {item.isRanked ? "Ranked 1v1 Battle" : "Contest Arena"}
-                          {item.battleRoomId ? ` [${item.battleRoomId}]` : ""}
-                        </span>
-                      )}
-
-                      {isDaily && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-yellow-500/15 text-yellow-400 border border-yellow-500/30 flex items-center gap-1">
-                          <FaBolt size={9} /> Daily Blitz
-                        </span>
-                      )}
-
-                      {!isBattle && !isDaily && (
-                        <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-400 border border-blue-500/30">
-                          Solo Practice
-                        </span>
-                      )}
+                      {/* PRACTICE BADGE */}
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider bg-blue-500/15 text-blue-400 border border-blue-500/30">
+                        Solo Practice
+                      </span>
 
                       {/* VERDICT BADGE */}
                       {isAccepted ? (
@@ -391,8 +367,6 @@ const SolvedHistoryViewer = ({
                         code: codeToView,
                         submittedAt,
                         isAccepted,
-                        isBattle,
-                        battleRoomId: item.battleRoomId,
                         testsPassed: item.testsPassed,
                         totalTests: item.totalTests
                       })
@@ -442,13 +416,8 @@ const SolvedHistoryViewer = ({
                           : "bg-red-500/20 text-red-400 border border-red-500/30"
                       }`}
                     >
-                      {selectedSolution.isAccepted ? "Accepted Solution" : "Submission Attempt"}
+                      {selectedSolution.isAccepted ? "Accepted Practice Solution" : "Practice Submission Attempt"}
                     </span>
-                    {selectedSolution.isBattle && (
-                      <span className="text-[10px] px-2 py-0.5 rounded font-mono font-bold uppercase bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                        Competitive Match {selectedSolution.battleRoomId ? `(${selectedSolution.battleRoomId})` : ""}
-                      </span>
-                    )}
                   </div>
                   <p className="text-[11px] text-gray-400 font-mono mt-0.5">
                     Language: <strong className="text-white uppercase">{selectedSolution.language}</strong> • Submitted: {new Date(selectedSolution.submittedAt).toLocaleString()}
