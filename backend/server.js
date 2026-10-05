@@ -87,6 +87,22 @@ io.on('connection', (socket) => {
   socket.on('join-team-voice', ({ roomId, team, username }) => {
     const teamChannel = `${roomId}-team-${team}`;
     socket.join(teamChannel);
+
+    if (!global.teamVoiceMembers) {
+      global.teamVoiceMembers = new Map();
+    }
+    if (!global.teamVoiceMembers.has(teamChannel)) {
+      global.teamVoiceMembers.set(teamChannel, []);
+    }
+    const currentList = global.teamVoiceMembers.get(teamChannel);
+    const existingPeers = currentList.filter(m => m.socketId !== socket.id);
+    const updated = [...existingPeers, { socketId: socket.id, username }];
+    global.teamVoiceMembers.set(teamChannel, updated);
+
+    // Send existing peers list to the newly connected peer
+    socket.emit('team-voice-peers', { peers: existingPeers });
+
+    // Notify other peers in this squad that a new peer joined
     socket.to(teamChannel).emit('peer-voice-joined', {
       peerSocketId: socket.id,
       username
@@ -104,7 +120,22 @@ io.on('connection', (socket) => {
   socket.on('leave-team-voice', ({ roomId, team }) => {
     const teamChannel = `${roomId}-team-${team}`;
     socket.leave(teamChannel);
+    if (global.teamVoiceMembers && global.teamVoiceMembers.has(teamChannel)) {
+      const remaining = global.teamVoiceMembers.get(teamChannel).filter(m => m.socketId !== socket.id);
+      global.teamVoiceMembers.set(teamChannel, remaining);
+    }
     socket.to(teamChannel).emit('peer-voice-left', { peerSocketId: socket.id });
+  });
+
+  // Team Problem Claiming / Coordination (Divide and conquer)
+  socket.on('team-claim-problem', ({ roomId, team, username, problemIndex, problemTitle }) => {
+    const teamChannel = `${roomId}-team-${team}`;
+    io.to(teamChannel).emit('team-problem-claimed', {
+      username,
+      problemIndex,
+      problemTitle,
+      claimedAt: Date.now()
+    });
   });
 
   // Team Tactical Chat (Invisible to opposing squad)
@@ -373,6 +404,10 @@ io.on('connection', (socket) => {
   socket.on('disconnecting', () => {
     for (const room of socket.rooms) {
       if (room !== socket.id) {
+        if (global.teamVoiceMembers && global.teamVoiceMembers.has(room)) {
+          const remaining = global.teamVoiceMembers.get(room).filter(m => m.socketId !== socket.id);
+          global.teamVoiceMembers.set(room, remaining);
+        }
         socket.to(room).emit('peer-voice-left', { peerSocketId: socket.id });
       }
     }

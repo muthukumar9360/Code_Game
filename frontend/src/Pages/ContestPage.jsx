@@ -12,7 +12,8 @@ import {
   FaTrophy,
   FaChevronLeft,
   FaChevronRight,
-  FaBolt
+  FaBolt,
+  FaUsers
 } from "react-icons/fa";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
@@ -91,7 +92,15 @@ const ContestPage = () => {
       (p.userId ? p.userId !== localStorage.getItem("userId") : true)
   );
 
-  const myTeam = myParticipant?.team || "solo";
+  const isTeamMatch = Boolean(
+    battle?.battleType === "2vs2" ||
+    battle?.battleType === "4vs4" ||
+    location.state?.battleType === "2vs2" ||
+    location.state?.battleType === "4vs4"
+  );
+  const myTeam = myParticipant?.team && myParticipant.team !== "solo"
+    ? myParticipant.team
+    : (isTeamMatch ? (location.state?.team || "A") : "solo");
   const isSpectator = myParticipant?.isSpectator || location.state?.hostRole === "spectator" || location.state?.isSpectator;
   const myTimeLeft = myParticipant?.timeLeft !== undefined && myParticipant?.timeLeft !== null
     ? myParticipant.timeLeft
@@ -103,6 +112,9 @@ const ContestPage = () => {
     (contestId && contestId.startsWith("RNK")) ||
     (battle?.roomId && battle.roomId.startsWith("RNK"))
   );
+
+  // Team Problem Claiming State ({ [problemIndex]: claimedByUsername })
+  const [teamClaims, setTeamClaims] = useState({});
 
   // Check if problem is solved
   const isProblemSolved = (prob) => {
@@ -118,6 +130,23 @@ const ContestPage = () => {
   const mySolvedCount = problemsList.filter(isProblemSolved).length;
   const totalRequired = problemsList.length || 1;
   const opponentSolvedCount = opponentParticipant?.solvedProblems?.length || 0;
+
+  // Claim problem for team coordination
+  const handleClaimProblem = (targetIndex) => {
+    if (!socketRef.current || myTeam === "solo") return;
+    const prob = problemsList[targetIndex];
+    socketRef.current.emit("team-claim-problem", {
+      roomId: battle?.roomId || contestId,
+      team: myTeam,
+      username: myUsername,
+      problemIndex: targetIndex,
+      problemTitle: prob?.title || `Question ${targetIndex + 1}`
+    });
+    setTeamClaims((prev) => ({
+      ...prev,
+      [targetIndex]: myUsername
+    }));
+  };
 
   // Handle switching between questions
   const handleSwitchProblem = (newIndex) => {
@@ -146,6 +175,11 @@ const ContestPage = () => {
     setHint("");
     setShowHintBox(false);
     setDebugOutput((prev) => prev + `> Switched to Challenge #${newIndex + 1}: ${nextProblem?.title || `Question ${newIndex + 1}`}\n`);
+
+    // In team match, automatically broadcast to teammates that you are tackling this challenge
+    if (myTeam !== "solo") {
+      handleClaimProblem(newIndex);
+    }
   };
 
   // Handle language switch with per-problem code preservation
@@ -333,6 +367,14 @@ const ContestPage = () => {
     socketRef.current.on("problem-solved-update", (data) => {
       setDebugOutput((prev) => prev + `> ⚔️ [ARENA TELEMETRY] ${data.username} solved a challenge! (${data.solvedCount}/${data.totalRequired})\n`);
       fetchBattleStatus();
+    });
+
+    socketRef.current.on("team-problem-claimed", ({ username, problemIndex, problemTitle }) => {
+      setTeamClaims((prev) => ({
+        ...prev,
+        [problemIndex]: username
+      }));
+      setDebugOutput((prev) => prev + `> 👥 [SQUAD COORD] ${username} claimed Challenge #${problemIndex + 1}: ${problemTitle || ""}\n`);
     });
 
     return () => {
@@ -680,11 +722,11 @@ const ContestPage = () => {
           )}
 
           {/* SQUAD TEAM VOICE & TACTICAL CHAT (IF TEAM MATCH) */}
-          {myTeam !== "solo" && (
+          {(myTeam !== "solo" || isTeamMatch) && (
             <TeamVoiceComms
               socket={socketRef.current}
               roomId={battle?.roomId || contestId}
-              team={myTeam}
+              team={myTeam !== "solo" ? myTeam : "A"}
               username={myUsername}
             />
           )}
@@ -745,6 +787,21 @@ const ContestPage = () => {
                       <FaCheckCircle className="text-emerald-400 text-xs shrink-0" />
                     ) : (
                       <span className="text-[10px] opacity-60 capitalize font-sans">{diff}</span>
+                    )}
+
+                    {/* SQUAD TEAM CLAIM BADGE */}
+                    {myTeam !== "solo" && teamClaims[idx] && (
+                      <span
+                        className={`text-[9px] px-1.5 py-0.5 rounded font-mono font-bold tracking-tight uppercase flex items-center gap-1 ${
+                          teamClaims[idx] === myUsername
+                            ? "bg-black/60 text-orange-400 border border-orange-400/50"
+                            : "bg-blue-500/30 text-blue-200 border border-blue-400/40"
+                        }`}
+                        title={`${teamClaims[idx]} is solving Q${idx + 1}`}
+                      >
+                        <FaUsers size={8} />
+                        <span>{teamClaims[idx] === myUsername ? "You" : teamClaims[idx]}</span>
+                      </span>
                     )}
                   </button>
                 );
@@ -834,6 +891,36 @@ const ContestPage = () => {
 
           {/* PROBLEM CONTENT */}
           <div className="p-6 overflow-y-auto custom-scrollbar flex-1 min-h-0" onCopy={handleCopyBlocked}>
+            {/* TEAM SQUAD ASSIGNMENT BANNER */}
+            {myTeam !== "solo" && (
+              <div className="mb-4 p-3 rounded-xl bg-blue-950/40 border border-blue-500/40 text-xs font-mono flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <FaUsers className="text-blue-400 text-sm shrink-0" />
+                  <div>
+                    <span className="text-gray-400">Team {myTeam} Assignment: </span>
+                    {teamClaims[safeActiveIndex] ? (
+                      <span className="font-bold text-white">
+                        {teamClaims[safeActiveIndex] === myUsername
+                          ? "👤 You are currently tackling this challenge"
+                          : `👤 ${teamClaims[safeActiveIndex]} is actively solving this challenge`}
+                      </span>
+                    ) : (
+                      <span className="text-amber-400 font-bold">Unclaimed (Available to pick)</span>
+                    )}
+                  </div>
+                </div>
+
+                {teamClaims[safeActiveIndex] !== myUsername && (
+                  <button
+                    onClick={() => handleClaimProblem(safeActiveIndex)}
+                    className="px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 hover:text-white rounded-lg text-[10px] uppercase font-bold tracking-wider border border-blue-400/40 transition shrink-0 cursor-pointer"
+                  >
+                    Claim Challenge
+                  </button>
+                )}
+              </div>
+            )}
+
             {isProblemSolved(currentProblem) && (
               <div className="mb-4 px-3.5 py-2 rounded-xl bg-green-500/15 border border-green-500/40 text-green-300 text-xs font-bold flex items-center gap-2">
                 <FaCheckCircle className="text-green-400 text-sm shrink-0" />

@@ -19,6 +19,7 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
 
   const localStreamRef = useRef(null);
   const peerConnectionsRef = useRef({});
+  const audioElementsRef = useRef([]);
 
   // Team channel identifier
   const teamLabel = team === "solo" ? "Squad Comms" : `Team ${team} Comms`;
@@ -29,6 +30,13 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
     // Join team voice & chat room
     socket.emit("join-team-voice", { roomId, team, username });
 
+    // Initial peers list for newly joined peer
+    socket.on("team-voice-peers", ({ peers: existingList }) => {
+      if (Array.isArray(existingList)) {
+        setPeers(existingList.map(p => ({ id: p.socketId, name: p.username })));
+      }
+    });
+
     // Incoming team chat message
     socket.on("team-chat-received", (msg) => {
       setMessages((prev) => [...prev.slice(-30), msg]);
@@ -36,8 +44,11 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
 
     // Teammate connected to voice
     socket.on("peer-voice-joined", async ({ peerSocketId, username: peerName }) => {
-      setPeers((prev) => [...new Set([...prev, { id: peerSocketId, name: peerName }])]);
-      setVoiceNotice(`📡 ${peerName} linked to ${teamLabel}`);
+      setPeers((prev) => {
+        const filtered = prev.filter(p => p.id !== peerSocketId);
+        return [...filtered, { id: peerSocketId, name: peerName }];
+      });
+      setVoiceNotice(`📡 ${peerName} joined ${teamLabel}`);
       setTimeout(() => setVoiceNotice(""), 3500);
 
       if (micActive && localStreamRef.current) {
@@ -117,7 +128,9 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
     pc.ontrack = (e) => {
       const audio = new Audio();
       audio.srcObject = e.streams[0];
+      audio.autoplay = true;
       audio.play().catch(() => {});
+      audioElementsRef.current.push(audio);
     };
 
     return pc;
@@ -148,12 +161,25 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         localStreamRef.current = stream;
         setMicActive(true);
-        setVoiceNotice("🎙️ Squad voice frequency active (Encrypted).");
+        setVoiceNotice("🎙️ Squad voice live (Microphone connected).");
         setTimeout(() => setVoiceNotice(""), 2500);
 
-        // Add stream to all active peer connections
-        Object.values(peerConnectionsRef.current).forEach((pc) => {
-          stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+        // Connect audio tracks to all peers in the squad
+        peers.forEach((peer) => {
+          let pc = peerConnectionsRef.current[peer.id];
+          if (!pc) {
+            initiatePeerConnection(peer.id, true);
+          } else {
+            stream.getTracks().forEach((track) => pc.addTrack(track, stream));
+            pc.createOffer().then((offer) => {
+              pc.setLocalDescription(offer);
+              socket.emit("voice-signal", {
+                targetSocketId: peer.id,
+                signal: { sdp: pc.localDescription },
+                senderName: username,
+              });
+            });
+          }
         });
       } catch (err) {
         console.error("Mic access failed", err);
@@ -168,6 +194,13 @@ const TeamVoiceComms = ({ socket, roomId, team = "A", username = "Teammate" }) =
       localStreamRef.current.getTracks().forEach((t) => t.stop());
       localStreamRef.current = null;
     }
+    audioElementsRef.current.forEach((a) => {
+      try {
+        a.pause();
+        a.srcObject = null;
+      } catch (e) {}
+    });
+    audioElementsRef.current = [];
   };
 
   // Send team tactical message

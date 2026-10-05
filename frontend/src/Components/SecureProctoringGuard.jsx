@@ -9,17 +9,29 @@ import { FaShieldAlt, FaExpand, FaExclamationTriangle, FaLock, FaBan } from "rea
  * 3. Complete block of Screenshots (PrintScreen, Win+Shift+S, Snipping tools)
  * 4. Zero-tolerance breach detection: any tab switch, window blur, resize/exit fullscreen immediately closes the session.
  */
+/**
+ * STRICT_FULLSCREEN_LOCKDOWN Flag:
+ * Set to false per user request: "temporarily stop the full screen because i need to test the entire platform"
+ * When false, the full-screen gateway modal and auto-termination listeners are paused.
+ * Setting this to true re-activates the 100% strict lockdown.
+ */
+export const STRICT_FULLSCREEN_LOCKDOWN = false;
+
 export const useSecureProctoring = ({
   onTerminate,
   enabled = true,
   environmentName = "Coding Environment"
 }) => {
-  const [isFullscreen, setIsFullscreen] = useState(Boolean(document.fullscreenElement));
-  const [hasEnteredFullscreenOnce, setHasEnteredFullscreenOnce] = useState(false);
+  const isLockdownActive = enabled && STRICT_FULLSCREEN_LOCKDOWN;
+  const [isFullscreen, setIsFullscreen] = useState(
+    isLockdownActive ? Boolean(document.fullscreenElement) : true
+  );
+  const [hasEnteredFullscreenOnce, setHasEnteredFullscreenOnce] = useState(!isLockdownActive);
   const isTerminatingRef = useRef(false);
 
   // Request fullscreen wrapper
   const enterFullscreen = useCallback(async () => {
+    if (!isLockdownActive) return;
     try {
       if (!document.fullscreenElement) {
         await document.documentElement.requestFullscreen();
@@ -29,11 +41,11 @@ export const useSecureProctoring = ({
     } catch (err) {
       console.warn("Fullscreen permission or activation required:", err);
     }
-  }, []);
+  }, [isLockdownActive]);
 
   // Trigger immediate session termination and screen closure
   const triggerViolation = useCallback((reason) => {
-    if (isTerminatingRef.current || !enabled) return;
+    if (!isLockdownActive || isTerminatingRef.current) return;
     isTerminatingRef.current = true;
 
     // Clear clipboard to avoid any captured data
@@ -62,7 +74,7 @@ export const useSecureProctoring = ({
   }, [enabled, onTerminate]);
 
   useEffect(() => {
-    if (!enabled) return;
+    if (!isLockdownActive) return;
 
     // Attempt automatic fullscreen on mount
     enterFullscreen();
@@ -222,7 +234,7 @@ export const useSecureProctoring = ({
  * Prompts user to click and activate full-screen mode if the browser blocked automatic fullscreen on load.
  */
 export const FullscreenGatewayModal = ({ isFullscreen, onEnterFullscreen, environmentName = "Arena" }) => {
-  if (isFullscreen) return null;
+  if (!STRICT_FULLSCREEN_LOCKDOWN || isFullscreen) return null;
 
   return (
     <div className="fixed inset-0 z-50 bg-[#03070b]/98 backdrop-blur-xl flex items-center justify-center p-4 select-none">
