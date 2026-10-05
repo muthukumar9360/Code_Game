@@ -43,6 +43,7 @@ const ContestPage = () => {
   // Multi-Question Selection & Code Preservation State
   const [activeProblemIndex, setActiveProblemIndex] = useState(0);
   const [codeMap, setCodeMap] = useState({});
+  const [opponentDraftCode, setOpponentDraftCode] = useState({});
 
   const [showResultPopup, setShowResultPopup] = useState(false);
   const [isWinner, setIsWinner] = useState(false);
@@ -242,34 +243,58 @@ const ContestPage = () => {
         roomId: battle?.roomId || contestId,
         username: myUsername,
         code,
+        language,
+        problemId: currentProblem?._id,
         testsPassed: results.filter((r) => r.passed).length,
         totalTests: results.length || currentProblem?.testcases?.length || 10,
       });
     }, 500);
     return () => clearTimeout(t);
-  }, [code, results, isSpectator, battle?.roomId, contestId, myUsername, currentProblem]);
+  }, [code, language, results, isSpectator, battle?.roomId, contestId, myUsername, currentProblem]);
 
-  // Abandon Battle handler
-  const handleAbandon = useCallback(async (force = false) => {
-    if (!force && !window.confirm("Warning: Abandoning will register an immediate defeat. Are you sure?")) return;
+  // Exit / Abandon Battle handler (Always navigates to results page to review full telemetry)
+  const handleExitBattle = useCallback(async (force = false) => {
+    // If battle has already concluded, immediately proceed to results
+    if (battle?.status === "finished") {
+      navigate(`/results/${contestId}`, {
+        state: { opponentDraftCode }
+      });
+      return;
+    }
+
+    if (
+      !force &&
+      !window.confirm(
+        "Warning: Leaving an active match will register an immediate defeat. Are you sure you want to exit and review match telemetry?"
+      )
+    ) {
+      return;
+    }
+
     const token = localStorage.getItem("token");
     try {
       await axios.post(
         `${API}/api/battles/${contestId}/abandon`,
-        {},
+        {
+          code,
+          language,
+          problemId: currentProblem?._id
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      navigate(`/results/${contestId}`);
     } catch (err) {
-      console.error("Abandon failed:", err);
-      navigate("/");
+      console.warn("Abandon request completed (navigating to results telemetry):", err);
+    } finally {
+      navigate(`/results/${contestId}`, {
+        state: { opponentDraftCode }
+      });
     }
-  }, [API, contestId, navigate]);
+  }, [API, contestId, navigate, battle?.status, code, language, currentProblem, opponentDraftCode]);
 
   // Strict Zero-Tolerance Proctoring
   const handleSecurityTermination = useCallback((reason) => {
-    handleAbandon(true);
-  }, [handleAbandon]);
+    handleExitBattle(true);
+  }, [handleExitBattle]);
 
   const { isFullscreen, enterFullscreen, triggerViolation } = useSecureProctoring({
     onTerminate: handleSecurityTermination,
@@ -311,7 +336,7 @@ const ContestPage = () => {
       if (res.data?.battle) {
         if (res.data.battle.status === "finished") {
           // Room is already completed! Cannot re-enter active arena with old URL.
-          navigate(`/results/${contestId}`, { replace: true });
+          navigate(`/results/${contestId}`, { replace: true, state: { opponentDraftCode } });
           return;
         }
         setBattle(res.data.battle);
@@ -323,7 +348,7 @@ const ContestPage = () => {
         setSyncError(err.response?.data?.error || "Failed to synchronize with contest node.");
       }
     }
-  }, [API, contestId, navigate, location.state?.battle]);
+  }, [API, contestId, navigate, location.state?.battle, opponentDraftCode]);
 
   // Initial and reactive status sync
   useEffect(() => {
@@ -357,6 +382,15 @@ const ContestPage = () => {
         setIsWinner(currentWinner === myUsername);
         setWinnerName(currentWinner || "A Combatant");
         setShowResultPopup(true);
+      }
+    });
+
+    socketRef.current.on("opponent-code-update", (data) => {
+      if (data && data.username && data.code) {
+        setOpponentDraftCode((prev) => ({
+          ...prev,
+          [data.username]: data.code
+        }));
       }
     });
 
@@ -657,11 +691,11 @@ const ContestPage = () => {
       <nav className="w-full py-2.5 px-4 sm:px-6 md:px-8 bg-[#0a1118] border-b border-white/20 flex justify-between items-center shrink-0 z-40 backdrop-blur-md">
         <div className="flex items-center gap-3">
           <button
-            onClick={() => handleAbandon(false)}
-            className="flex items-center gap-1.5 text-gray-300 hover:text-red-400 text-xs font-bold uppercase transition bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/30 hover:border-white"
-            title="Leave Contest"
+            onClick={() => handleExitBattle(false)}
+            className="flex items-center gap-1.5 text-gray-300 hover:text-red-400 text-xs font-bold uppercase transition bg-white/5 hover:bg-white/10 px-2.5 py-1.5 rounded-lg border border-white/30 hover:border-white cursor-pointer"
+            title={battle?.status === "finished" ? "View Match Results" : "Exit Match"}
           >
-            <FaArrowLeft /> Exit Contest
+            <FaArrowLeft /> {battle?.status === "finished" ? "View Results" : (isRanked ? "Exit Battle" : "Exit Contest")}
           </button>
 
           <span className="text-gray-500">|</span>
@@ -1078,7 +1112,9 @@ const ContestPage = () => {
           winnerName={winnerName}
           onClose={() => {
             setShowResultPopup(false);
-            navigate(`/results/${contestId}`);
+            navigate(`/results/${contestId}`, {
+              state: { opponentDraftCode }
+            });
           }}
         />
       )}

@@ -26,8 +26,19 @@ const battleSchema = new Schema({
     bestScore: {
       type: Number,
       default: 0
-    }
-    ,
+    },
+    username: {
+      type: String,
+      default: ''
+    },
+    lastCode: {
+      type: String,
+      default: ''
+    },
+    lastLanguage: {
+      type: String,
+      default: 'python'
+    },
     timeLeft: {
       type: Number, // seconds remaining for this participant
       default: null

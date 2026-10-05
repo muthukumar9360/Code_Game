@@ -45,12 +45,15 @@ const CodeDiffViewer = ({
           (currentProblem?._id && s.problemId && s.problemId.toString() === currentProblem._id.toString()) ||
           idx === safeProblemIndex
       );
-      if (match) return match;
+      if (match && match.code && match.code.trim()) return match;
     }
 
+    const fallbackCode = selectedParticipant.code || selectedParticipant.lastCode || "";
+    const fallbackLang = selectedParticipant.language || selectedParticipant.lastLanguage || "python";
+
     return {
-      code: selectedParticipant.code || "",
-      language: selectedParticipant.language || "javascript",
+      code: fallbackCode,
+      language: fallbackLang,
       passedCount: selectedParticipant.bestScore || 0,
       totalTests: null,
       isSolved: selectedParticipant.result === "win"
@@ -147,7 +150,7 @@ const CodeDiffViewer = ({
 
             // Find specific sub info for problem
             const sub = (Array.isArray(p.submissions) && p.submissions[safeProblemIndex]) || null;
-            const hasSubmitted = Boolean(sub?.code || (!sub && p.code));
+            const hasSubmitted = Boolean(sub?.code || (!sub && p.code) || p.code || p.lastCode);
             const passed = sub?.passedCount !== undefined ? sub.passedCount : p.bestScore;
 
             return (

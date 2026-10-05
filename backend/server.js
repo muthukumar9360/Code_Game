@@ -148,8 +148,8 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Spectator Live Cast Telemetry Broadcast
-  socket.on('spectator-stream-update', ({ roomId, username, code, cursor, testsPassed, totalTests }) => {
+  // Spectator & Opponent Live Cast Telemetry Broadcast
+  socket.on('spectator-stream-update', async ({ roomId, username, code, cursor, testsPassed, totalTests, problemId, language }) => {
     io.to(roomId).emit('spectator-stream-received', {
       username,
       code,
@@ -158,6 +158,33 @@ io.on('connection', (socket) => {
       totalTests,
       updatedAt: Date.now()
     });
+
+    // Also send directly to other combatants in the arena for post-match solution inspection
+    socket.to(roomId).emit('opponent-code-update', {
+      username,
+      code,
+      testsPassed,
+      totalTests,
+      problemId,
+      language
+    });
+
+    // Persist draft code to battle in background so post-match inspector always has opponent code
+    if (roomId && username && code && typeof code === 'string' && code.trim()) {
+      try {
+        const battle = await Battle.findOne({ roomId: { $regex: new RegExp(`^${roomId.trim()}$`, 'i') } });
+        if (battle && battle.status !== 'finished') {
+          const p = battle.participants.find(pt => pt.username === username || (pt.user && pt.user.toString() === socket.userId));
+          if (p) {
+            p.lastCode = code;
+            if (language) p.lastLanguage = language;
+            await battle.save();
+          }
+        }
+      } catch (err) {
+        // silent background persist
+      }
+    }
   });
 
   // Helper to safely resolve a valid MongoDB ObjectId for a user
@@ -238,8 +265,8 @@ io.on('connection', (socket) => {
           startTime: new Date(),
           status: 'active',
           participants: [
-            { user: validUserId, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] },
-            { user: validOpponentUserId, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] }
+            { user: validUserId, username, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] },
+            { user: validOpponentUserId, username: opponent.username, status: 'playing', hostRole: 'player', timeLeft: 30 * 60, assignedProblem: problemIds[0] }
           ]
         });
         await battle.save();

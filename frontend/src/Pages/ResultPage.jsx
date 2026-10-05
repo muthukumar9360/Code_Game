@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import React, { useEffect, useState, useMemo } from "react";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import {
   FaTrophy,
@@ -20,6 +20,7 @@ import HackathonReportModal from "../Components/HackathonReportModal.jsx";
 const ResultPage = () => {
   const { contestId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [battle, setBattle] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -57,6 +58,29 @@ const ResultPage = () => {
     fetchSummary();
   }, [contestId, API, navigate]);
 
+  // Enrich participants with live opponent draft code if backend code is empty
+  const enrichedParticipants = useMemo(() => {
+    if (!battle?.participants) return [];
+    const copy = JSON.parse(JSON.stringify(battle.participants));
+    const draftMap = location.state?.opponentDraftCode || {};
+
+    return copy.map(p => {
+      const draft = draftMap[p.username];
+      if (draft && (!p.code || !p.code.trim())) {
+        p.code = draft;
+      }
+      if (p.submissions && Array.isArray(p.submissions)) {
+        p.submissions = p.submissions.map((sub) => {
+          if ((!sub.code || !sub.code.trim()) && draft) {
+            return { ...sub, code: draft };
+          }
+          return sub;
+        });
+      }
+      return p;
+    });
+  }, [battle?.participants, location.state]);
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#050b10] flex flex-col justify-center items-center text-white font-sans">
@@ -84,13 +108,13 @@ const ResultPage = () => {
     );
   }
 
-  const myRecord = battle.participants.find(
+  const myRecord = enrichedParticipants.find(
     p => (p.userId && p.userId.toString() === currentUserId) || p.username === currentUsername
   );
 
   const isWinner = myRecord?.result === "win";
   const isDraw = myRecord?.result === "draw";
-  const winner = battle.participants.find(p => p.result === "win");
+  const winner = enrichedParticipants.find(p => p.result === "win");
 
   return (
     <div className="min-h-screen w-full bg-[#050b10] text-white flex flex-col items-center justify-start px-2 sm:px-4 md:px-6 py-6 sm:py-8 pb-16 relative font-sans">
@@ -190,7 +214,7 @@ const ResultPage = () => {
           </div>
 
           <div className="space-y-3">
-            {battle.participants.map((p, idx) => {
+            {enrichedParticipants.map((p, idx) => {
               const isParticipantWinner = p.result === "win";
               const isCurrentUser = (p.userId && p.userId.toString() === currentUserId) || p.username === currentUsername;
 
@@ -213,7 +237,7 @@ const ResultPage = () => {
                       <div className="font-bold text-sm flex items-center gap-2">
                         {p.username || "Combatant"}
                         {isCurrentUser && (
-                          <span className="text-[9px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-mono uppercase border border-orange-500/40">
+                          <span className="text-[9px] bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-mono font-bold uppercase border border-orange-500/40">
                             You
                           </span>
                         )}
@@ -247,7 +271,7 @@ const ResultPage = () => {
 
         {/* POST-MATCH MULTI-QUESTION SOLUTION INSPECTOR */}
         <CodeDiffViewer
-          participants={battle.participants}
+          participants={enrichedParticipants}
           problems={battle.problems && battle.problems.length > 0 ? battle.problems : (battle.problem ? [battle.problem] : [])}
           currentUserId={currentUserId}
           currentUsername={currentUsername}

@@ -11,10 +11,11 @@ import { awardBattleRewards } from '../services/rewardService.js';
 // Helper: accept either Mongo ObjectId or roomId string
 const resolveBattle = (idOrRoomId) => {
   if (!idOrRoomId) return null;
-  if (mongoose.Types.ObjectId.isValid(idOrRoomId)) {
-    return Battle.findById(idOrRoomId);
+  const cleanId = String(idOrRoomId).trim();
+  if (mongoose.Types.ObjectId.isValid(cleanId)) {
+    return Battle.findById(cleanId);
   }
-  return Battle.findOne({ roomId: idOrRoomId });
+  return Battle.findOne({ roomId: { $regex: new RegExp(`^${cleanId}$`, 'i') } });
 };
 
 const participantUserId = (p) => {
@@ -1061,19 +1062,48 @@ export const abandonBattle = async (req, res) => {
   try {
     const { battleId } = req.params;
     const userId = req.user.id;
+    const { code, language, problemId } = req.body || {};
 
     const battle = await resolveBattle(battleId).populate('participants.user', 'username');
     if (!battle) {
       return res.status(404).json({ error: 'Battle not found' });
     }
 
-    if (battle.status !== 'active') {
-      return res.status(400).json({ error: 'Battle is not active' });
+    // If battle is already finished, treat as successful exit
+    if (battle.status === 'finished') {
+      return res.json({
+        success: true,
+        status: 'finished',
+        message: 'Battle is already finished.'
+      });
     }
 
     const participant = battle.participants.find(p => participantUserId(p) === userId);
     if (!participant) {
       return res.status(403).json({ error: 'Not a participant in this battle' });
+    }
+
+    // Save exiting user's code if provided so post-match inspector can display it
+    if (code && typeof code === 'string' && code.trim()) {
+      participant.lastCode = code;
+      if (language) participant.lastLanguage = language;
+      try {
+        const probId = problemId || battle.problem || (battle.problems && battle.problems[0]);
+        if (probId) {
+          await Submission.create({
+            user: userId,
+            problem: probId,
+            battle: battle._id,
+            code,
+            language: language || 'python',
+            overallResult: 'abandoned',
+            status: 'completed',
+            results: []
+          });
+        }
+      } catch (subErr) {
+        console.error('Failed to create snapshot submission on abandon:', subErr);
+      }
     }
 
     participant.result = 'lose';
@@ -1095,8 +1125,8 @@ export const abandonBattle = async (req, res) => {
       io.to(battle.roomId).emit('battle-ended', {
         battleId: battle._id,
         roomId: battle.roomId,
-        winner: winner?.user?.username || null,
-        message: `${participant.user?.username || 'A player'} abandoned the battle.`,
+        winner: winner?.user?.username || winner?.username || null,
+        message: `${participant.user?.username || participant.username || 'A player'} forfeited the battle.`,
         rewards
       });
     }
@@ -1151,12 +1181,15 @@ export const getBattleSummary = async (req, res) => {
         const passed = Array.isArray(sub?.results) ? sub.results.filter(r => r.testcase && r.testcase.passed).length : 0;
         const total = Array.isArray(sub?.results) && sub.results.length > 0 ? sub.results.length : (prob.testcases?.length || 0);
 
+        const resolvedCode = sub?.code || (idx === 0 ? p.lastCode : "") || p.lastCode || "";
+        const resolvedLang = sub?.language || p.lastLanguage || "python";
+
         return {
           problemId: prob._id,
           problemTitle: prob.title || `Question ${idx + 1}`,
           difficulty: prob.difficulty || "medium",
-          code: sub?.code || "",
-          language: sub?.language || "javascript",
+          code: resolvedCode,
+          language: resolvedLang,
           passedCount: passed,
           totalTests: total,
           isSolved: passed === total && total > 0,
@@ -1164,9 +1197,12 @@ export const getBattleSummary = async (req, res) => {
         };
       });
 
+      const fallbackCode = bestSub?.code || p.lastCode || (submissionsByProblem[0]?.code || "");
+      const fallbackLang = bestSub?.language || p.lastLanguage || (submissionsByProblem[0]?.language || "python");
+
       return {
         userId: p.user?._id || p.user,
-        username: p.user?.username || (typeof p.user === 'string' ? p.user : 'Combatant'),
+        username: p.user?.username || p.username || (typeof p.user === 'string' ? p.user : 'Combatant'),
         tier: p.user?.tier,
         xp: p.user?.xp,
         result: p.result,
@@ -1174,8 +1210,10 @@ export const getBattleSummary = async (req, res) => {
         submissionTime: p.submissionTime,
         team: p.team || 'solo',
         isSpectator: p.isSpectator || false,
-        code: bestSub?.code || (submissionsByProblem[0]?.code || ""),
-        language: bestSub?.language || (submissionsByProblem[0]?.language || "javascript"),
+        code: fallbackCode,
+        language: fallbackLang,
+        lastCode: p.lastCode || "",
+        lastLanguage: p.lastLanguage || "python",
         executionResults: bestSub?.results || [],
         submissions: submissionsByProblem
       };
