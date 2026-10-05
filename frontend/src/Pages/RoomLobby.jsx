@@ -223,8 +223,23 @@ const RoomLobby = () => {
     };
   }, [activeRoomId, API, navigate, currentUsername, fetchRoom]);
 
-  // Host Approve/Decline handler (with optional team selection)
+  // Host Approve/Decline handler (with optional team selection & capacity validation)
   const handleApproveUser = async (targetUserId, action, assignedTeam = null) => {
+    // If approving in squad/duo team mode, pre-validate team capacity
+    if (action === "approve" && isTeamMode && assignedTeam) {
+      const currentTeamCount = assignedTeam === "A" ? teamAPlayers.length : teamBPlayers.length;
+      if (currentTeamCount >= slotsPerTeam) {
+        setError(`⚠️ Cannot approve: Team ${assignedTeam} has already reached maximum capacity (${slotsPerTeam}/${slotsPerTeam} players). Space does not fit. Please choose the other team or reassign players.`);
+        return;
+      }
+    }
+
+    // Pre-validate total capacity for all modes
+    if (action === "approve" && playersCount >= maxSlots) {
+      setError(`⚠️ Cannot approve: Battle room is already at full capacity (${maxSlots} players). Space is full.`);
+      return;
+    }
+
     setActionLoading(prev => ({ ...prev, [targetUserId]: true }));
     setError("");
     try {
@@ -622,6 +637,25 @@ const RoomLobby = () => {
                                 </span>
                               )}
                             </div>
+                            {isTeamMode && (
+                              <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                {teamAPlayers.length >= slotsPerTeam && (
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-blue-950/60 text-blue-300 border border-blue-500/40 font-bold">
+                                    Team A Full ({slotsPerTeam}/{slotsPerTeam})
+                                  </span>
+                                )}
+                                {teamBPlayers.length >= slotsPerTeam && (
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-orange-950/60 text-orange-300 border border-orange-500/40 font-bold">
+                                    Team B Full ({slotsPerTeam}/{slotsPerTeam})
+                                  </span>
+                                )}
+                                {teamAPlayers.length >= slotsPerTeam && teamBPlayers.length >= slotsPerTeam && (
+                                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/50 font-bold animate-pulse">
+                                    ⚠️ Both squads at full capacity. Reassign players to make space.
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </div>
 
@@ -630,29 +664,41 @@ const RoomLobby = () => {
                             <>
                               <button
                                 onClick={() => handleApproveUser(targetId, "approve", "A")}
-                                disabled={isProcessing}
-                                title="Approve and assign to Team A (Alpha)"
-                                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-blue-600/20 hover:bg-blue-600/35 text-blue-300 border border-blue-500/50 text-xs font-black uppercase tracking-wider transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                disabled={isProcessing || teamAPlayers.length >= slotsPerTeam}
+                                title={teamAPlayers.length >= slotsPerTeam ? `Team A is already full (${slotsPerTeam}/${slotsPerTeam} players)` : "Approve and assign to Team A (Alpha)"}
+                                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm border ${
+                                  teamAPlayers.length >= slotsPerTeam
+                                    ? "bg-gray-800/50 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60"
+                                    : "bg-blue-600/20 hover:bg-blue-600/35 text-blue-300 border-blue-500/50 cursor-pointer"
+                                }`}
                               >
-                                <FaUserCheck /> Approve to Team A
+                                <FaUserCheck /> {teamAPlayers.length >= slotsPerTeam ? "Team A Full (No Space)" : "Approve to Team A"}
                               </button>
                               <button
                                 onClick={() => handleApproveUser(targetId, "approve", "B")}
-                                disabled={isProcessing}
-                                title="Approve and assign to Team B (Bravo)"
-                                className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl bg-orange-500/20 hover:bg-orange-500/35 text-orange-300 border border-orange-500/50 text-xs font-black uppercase tracking-wider transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                                disabled={isProcessing || teamBPlayers.length >= slotsPerTeam}
+                                title={teamBPlayers.length >= slotsPerTeam ? `Team B is already full (${slotsPerTeam}/${slotsPerTeam} players)` : "Approve and assign to Team B (Bravo)"}
+                                className={`flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition active:scale-95 flex items-center justify-center gap-1.5 shadow-sm border ${
+                                  teamBPlayers.length >= slotsPerTeam
+                                    ? "bg-gray-800/50 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60"
+                                    : "bg-orange-500/20 hover:bg-orange-500/35 text-orange-300 border-orange-500/50 cursor-pointer"
+                                }`}
                               >
-                                <FaUserCheck /> Approve to Team B
+                                <FaUserCheck /> {teamBPlayers.length >= slotsPerTeam ? "Team B Full (No Space)" : "Approve to Team B"}
                               </button>
                             </>
                           ) : (
                             <button
                               onClick={() => handleApproveUser(targetId, "approve")}
-                              disabled={isProcessing}
-                              title="Approve Entrance"
-                              className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-green-500/20 hover:bg-green-500/30 text-green-400 border border-green-500/50 text-xs font-black uppercase tracking-wider transition active:scale-95 flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+                              disabled={isProcessing || playersCount >= maxSlots}
+                              title={playersCount >= maxSlots ? `Room is already full (${maxSlots}/${maxSlots} players)` : "Approve Entrance"}
+                              className={`flex-1 sm:flex-none px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition active:scale-95 flex items-center justify-center gap-2 shadow-sm border ${
+                                playersCount >= maxSlots
+                                  ? "bg-gray-800/50 text-gray-500 border-gray-700/50 cursor-not-allowed opacity-60"
+                                  : "bg-green-500/20 hover:bg-green-500/30 text-green-400 border-green-500/50 cursor-pointer"
+                              }`}
                             >
-                              <FaUserCheck /> Approve
+                              <FaUserCheck /> {playersCount >= maxSlots ? "Room Full (No Space)" : "Approve"}
                             </button>
                           )}
                           <button

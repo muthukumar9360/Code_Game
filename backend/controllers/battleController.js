@@ -675,10 +675,31 @@ export const approveParticipant = async (req, res) => {
     }
 
     if (action === 'approve') {
-      participant.approvalStatus = 'approved';
-      if (team && (team === 'A' || team === 'B')) {
-        participant.team = team;
+      const maxLimit = battle.maxParticipants || (battle.battleType === '2vs2' ? 4 : (battle.battleType === '4vs4' ? 8 : (battle.battleType === '3-ffa' ? 3 : 2)));
+      const activeApproved = battle.participants.filter(
+        p => !p.isSpectator && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
+      );
+
+      if (!participant.isSpectator && activeApproved.length >= maxLimit) {
+        return res.status(400).json({ error: `Cannot approve: Battle room is already at full capacity (${maxLimit} players). Space is full.` });
       }
+
+      if (battle.battleType === '2vs2' || battle.battleType === '4vs4') {
+        const assignedTeam = (team === 'A' || team === 'B') ? team : (participant.team === 'B' ? 'B' : 'A');
+        const maxPerTeam = battle.battleType === '2vs2' ? 2 : 4;
+        const currentTeamCount = battle.participants.filter(
+          p => p.team === assignedTeam && !p.isSpectator && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
+        ).length;
+
+        if (currentTeamCount >= maxPerTeam) {
+          return res.status(400).json({
+            error: `Cannot approve into Team ${assignedTeam}: Team ${assignedTeam} has reached maximum capacity (${maxPerTeam}/${maxPerTeam} players). Space does not fit.`
+          });
+        }
+        participant.team = assignedTeam;
+      }
+
+      participant.approvalStatus = 'approved';
     } else if (action === 'reject') {
       participant.approvalStatus = 'rejected';
     } else {
@@ -775,11 +796,11 @@ export const reassignParticipantTeam = async (req, res) => {
     // Verify team capacity for squad/duo
     const maxPerTeam = battle.battleType === '2vs2' ? 2 : (battle.battleType === '4vs4' ? 4 : 10);
     const targetTeamCount = battle.participants.filter(
-      p => p.team === team && !p.isSpectator && p.approvalStatus !== 'rejected' && participantUserId(p) !== targetUserId
+      p => p.team === team && !p.isSpectator && p.approvalStatus === 'approved' && participantUserId(p) !== targetUserId
     ).length;
 
     if (targetTeamCount >= maxPerTeam) {
-      return res.status(400).json({ error: `Team ${team} is already full (maximum ${maxPerTeam} players)` });
+      return res.status(400).json({ error: `Cannot switch: Team ${team} is already full (maximum ${maxPerTeam} players). Space is full.` });
     }
 
     participant.team = team;
