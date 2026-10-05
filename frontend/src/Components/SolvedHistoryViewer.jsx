@@ -23,7 +23,6 @@ const SolvedHistoryViewer = ({
   const [activeTab, setActiveTab] = useState("all"); // 'all' | 'solved' | 'attempted'
   const [searchQuery, setSearchQuery] = useState("");
   const [difficultyFilter, setDifficultyFilter] = useState("all");
-  const [statusFilter, setStatusFilter] = useState("all"); // 'all' | 'accepted' | 'failed'
   const [selectedSolution, setSelectedSolution] = useState(null);
   const [copied, setCopied] = useState(false);
 
@@ -125,7 +124,7 @@ const SolvedHistoryViewer = ({
 
   const baseItems = getBaseItems();
 
-  // Multi-facet filter (search by title/language, difficulty filter, verdict status filter)
+  // Multi-facet filter (search by title/language, difficulty filter)
   const filteredItems = baseItems.filter((item) => {
     const title = (item.title || item.problemTitle || "").toLowerCase();
     const lang = (item.language || "").toLowerCase();
@@ -140,16 +139,7 @@ const SolvedHistoryViewer = ({
       difficultyFilter === "all" ||
       (item.difficulty || "medium").toLowerCase() === difficultyFilter.toLowerCase();
 
-    const isAccepted =
-      (item.overallResult || "").toLowerCase() === "accepted" ||
-      (item.overallResult || "").toLowerCase() === "passed";
-
-    const matchesStatus =
-      statusFilter === "all" ||
-      (statusFilter === "accepted" && isAccepted) ||
-      (statusFilter === "failed" && !isAccepted);
-
-    return matchesSearch && matchesDiff && matchesStatus;
+    return matchesSearch && matchesDiff;
   });
 
   return (
@@ -225,20 +215,6 @@ const SolvedHistoryViewer = ({
 
         {/* FACET FILTERS */}
         <div className="flex flex-wrap items-center gap-2.5">
-          {/* VERDICT STATUS SELECTOR */}
-          <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono text-gray-300 shrink-0">Verdict:</span>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="px-2.5 py-1.5 bg-black/60 border border-white/30 rounded-xl text-xs font-mono text-white outline-none focus:border-white transition"
-            >
-              <option value="all">All Verdicts</option>
-              <option value="accepted">Accepted / Solved</option>
-              <option value="failed">Wrong / Attempted</option>
-            </select>
-          </div>
-
           {/* DIFFICULTY SELECTOR */}
           <div className="flex items-center gap-1.5">
             <span className="text-[11px] font-mono text-gray-300 shrink-0">Diff:</span>
