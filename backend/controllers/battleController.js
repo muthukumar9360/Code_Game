@@ -187,6 +187,8 @@ export const getBattleStatus = async (req, res) => {
         tier: (p.user && p.user.tier) ? p.user.tier : undefined,
         status: p.status,
         result: p.result,
+        team: p.team || 'solo',
+        isSpectator: Boolean(p.isSpectator),
         bestScore: p.bestScore || 0,
         solvedProblems: (p.solvedProblems || []).map(sp => sp._id ? sp._id.toString() : sp.toString()),
         timeLeft
@@ -651,7 +653,7 @@ export const approveParticipant = async (req, res) => {
   try {
     const { roomId } = req.params;
     const userId = req.user.id;
-    const { targetUserId, action } = req.body; // 'approve' or 'reject'
+    const { targetUserId, action, team } = req.body; // 'approve' or 'reject', optional 'team': 'A' | 'B'
 
     const battle = await Battle.findOne({ roomId })
       .populate('participants.user', 'username tier')
@@ -674,6 +676,9 @@ export const approveParticipant = async (req, res) => {
 
     if (action === 'approve') {
       participant.approvalStatus = 'approved';
+      if (team && (team === 'A' || team === 'B')) {
+        participant.team = team;
+      }
     } else if (action === 'reject') {
       participant.approvalStatus = 'rejected';
     } else {
@@ -713,7 +718,8 @@ export const approveParticipant = async (req, res) => {
         battle: battleData,
         targetUserId,
         action,
-        approvalStatus: participant.approvalStatus
+        approvalStatus: participant.approvalStatus,
+        team: participant.team
       });
       io.to(battle.roomId).emit('player-joined', { battle: battleData });
     }
@@ -723,10 +729,105 @@ export const approveParticipant = async (req, res) => {
       battle: battleData,
       targetUserId,
       action,
-      approvalStatus: participant.approvalStatus
+      approvalStatus: participant.approvalStatus,
+      team: participant.team
     });
   } catch (error) {
     console.error('Approve participant error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Reassign participant team in Duo / Squad room (Host / Admin only)
+export const reassignParticipantTeam = async (req, res) => {
+  try {
+    const { roomId } = req.params;
+    const userId = req.user.id;
+    const { targetUserId, team } = req.body; // team: 'A' | 'B'
+
+    if (!team || (team !== 'A' && team !== 'B')) {
+      return res.status(400).json({ error: 'Team must be designated as A or B' });
+    }
+
+    const battle = await Battle.findOne({ roomId })
+      .populate('participants.user', 'username tier')
+      .populate('problem')
+      .populate('problems');
+
+    if (!battle) {
+      return res.status(404).json({ error: 'Room not found' });
+    }
+
+    const isHost = participantUserId(battle.participants[0]) === userId;
+    if (!isHost) {
+      return res.status(403).json({ error: 'Only the room host can rearrange team rosters' });
+    }
+
+    if (battle.status !== 'waiting') {
+      return res.status(400).json({ error: 'Cannot rearrange teams once battle has started' });
+    }
+
+    const participant = battle.participants.find(p => participantUserId(p) === targetUserId);
+    if (!participant) {
+      return res.status(404).json({ error: 'Target user not found in this battle room' });
+    }
+
+    // Verify team capacity for squad/duo
+    const maxPerTeam = battle.battleType === '2vs2' ? 2 : (battle.battleType === '4vs4' ? 4 : 10);
+    const targetTeamCount = battle.participants.filter(
+      p => p.team === team && !p.isSpectator && p.approvalStatus !== 'rejected' && participantUserId(p) !== targetUserId
+    ).length;
+
+    if (targetTeamCount >= maxPerTeam) {
+      return res.status(400).json({ error: `Team ${team} is already full (maximum ${maxPerTeam} players)` });
+    }
+
+    participant.team = team;
+    await battle.save();
+
+    const battleData = {
+      id: battle._id,
+      roomId: battle.roomId,
+      battleType: battle.battleType,
+      problem: battle.problem,
+      problems: battle.problems,
+      problemCount: battle.problemCount || 1,
+      duration: battle.duration,
+      tier: battle.tier,
+      hostRole: battle.hostRole,
+      requiresApproval: battle.requiresApproval,
+      isTournament: battle.isTournament,
+      maxParticipants: battle.maxParticipants,
+      participants: battle.participants.map(p => ({
+        userId: participantUserId(p),
+        user: p.user?.username || participantUserId(p),
+        tier: p.user?.tier,
+        status: p.status,
+        team: p.team || 'solo',
+        isSpectator: p.isSpectator || false,
+        approvalStatus: p.approvalStatus || 'approved'
+      })),
+      status: battle.status
+    };
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(battle.roomId).emit('team-reassigned', {
+        battle: battleData,
+        targetUserId,
+        newTeam: team
+      });
+      io.to(battle.roomId).emit('player-joined', { battle: battleData });
+    }
+
+    res.json({
+      success: true,
+      battle: battleData,
+      targetUserId,
+      newTeam: team
+    });
+  } catch (error) {
+    console.error('Reassign team error:', error);
     res.status(500).json({ error: error.message });
   }
 };

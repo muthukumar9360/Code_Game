@@ -10,6 +10,7 @@ import {
   leaveRoom,
   getRoomStatus,
   approveParticipant,
+  reassignParticipantTeam,
   startBattle,
   submitSolution,
   abandonBattle,
@@ -26,6 +27,7 @@ router.post('/join-room/:roomId', authMiddleware, joinRoom);
 router.post('/leave-room/:roomId', authMiddleware, leaveRoom);
 router.get('/room/:roomId', authMiddleware, getRoomStatus);
 router.post('/room/:roomId/approve', authMiddleware, approveParticipant);
+router.post('/room/:roomId/reassign-team', authMiddleware, reassignParticipantTeam);
 
 // Contest Execution
 router.post('/start/:battleId', authMiddleware, startBattle);
