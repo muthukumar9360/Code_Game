@@ -189,6 +189,8 @@ export const getBattleStatus = async (req, res) => {
         result: p.result,
         team: p.team || 'solo',
         isSpectator: Boolean(p.isSpectator),
+        assignedProblem: p.assignedProblem,
+        assignedProblemIndex: p.assignedProblemIndex || 0,
         bestScore: p.bestScore || 0,
         solvedProblems: (p.solvedProblems || []).map(sp => sp._id ? sp._id.toString() : sp.toString()),
         timeLeft
@@ -278,7 +280,8 @@ export const createRoom = async (req, res) => {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    const count = Math.min(Math.max(parseInt(problemCount) || 1, 1), 10);
+    const minProblems = (battleType === '2vs2') ? 2 : (battleType === '4vs4' ? 4 : 1);
+    const count = Math.min(Math.max(parseInt(problemCount) || minProblems, minProblems), 10);
     let selectedProblems = [];
 
     if (selectionMode === 'manual' && Array.isArray(selectedProblemSlugs) && selectedProblemSlugs.length > 0) {
@@ -1094,8 +1097,29 @@ export const startBattle = async (req, res) => {
       return res.status(400).json({ error: `Need at least ${minParticipants} approved active player(s) to start a ${battle.battleType} battle` });
     }
 
-    // Assign problems to participants
-    const problemList = (battle.problems && battle.problems.length > 0) ? battle.problems : [battle.problem];
+    // Ensure sufficient problems are present for team matches (at least 2 for 2vs2, at least 4 for 4vs4)
+    const minProblemsNeeded = battle.battleType === '2vs2' ? 2 : (battle.battleType === '4vs4' ? 4 : 1);
+    let problemList = (battle.problems && battle.problems.length > 0) ? [...battle.problems] : (battle.problem ? [battle.problem] : []);
+
+    if (problemList.length < minProblemsNeeded) {
+      try {
+        const existingIds = problemList.map(p => (p && p._id) ? p._id.toString() : p.toString()).filter(Boolean);
+        const neededCount = minProblemsNeeded - problemList.length;
+        const additionalProblems = await Problem.aggregate([
+          { $match: { _id: { $nin: existingIds.map(id => new mongoose.Types.ObjectId(id)) } } },
+          { $sample: { size: neededCount } }
+        ]);
+        if (additionalProblems && additionalProblems.length > 0) {
+          problemList.push(...additionalProblems);
+          battle.problems = problemList.map(p => p._id || p);
+          battle.problemCount = problemList.length;
+          if (!battle.problem) battle.problem = problemList[0]._id || problemList[0];
+        }
+      } catch (err) {
+        console.warn("Problem replenishment error:", err);
+      }
+    }
+
     if (battle.battleType === '2vs2' || battle.battleType === '4vs4') {
       let teamACount = 0;
       let teamBCount = 0;
@@ -1140,7 +1164,8 @@ export const startBattle = async (req, res) => {
         status: p.status,
         team: p.team || 'solo',
         isSpectator: p.isSpectator || false,
-        assignedProblem: p.assignedProblem
+        assignedProblem: p.assignedProblem,
+        assignedProblemIndex: p.assignedProblemIndex || 0
       })),
       status: populated.status,
       startTime: populated.startTime,

@@ -76,13 +76,10 @@ const Signup = () => {
         <div className="w-1/2 flex flex-col justify-center px-12 bg-[#050b10] mt-10">
 
           <h2 className="text-4xl font-black text-center mb-8 tracking-tight">
-            CREATE
-            <span className="block text-transparent bg-clip-text bg-gradient-to-r from-orange-400 to-red-600">
-              ACCOUNT
-            </span>
+            CREATE ACCOUNT
           </h2>
 
-          <form className="flex flex-col gap-5" onSubmit={handleSignup}>
+          <form className="flex flex-col gap-2" onSubmit={handleSignup}>
 
             {/* FULL NAME */}
             <div>

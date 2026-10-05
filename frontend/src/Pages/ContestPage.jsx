@@ -41,7 +41,15 @@ const ContestPage = () => {
   const socketRef = useRef(null);
 
   // Multi-Question Selection & Code Preservation State
-  const [activeProblemIndex, setActiveProblemIndex] = useState(0);
+  const initialAssignedIndex = location.state?.battle?.participants?.find(
+    (p) =>
+      p.user === (location.state?.username || localStorage.getItem("username") || "Combatant").trim() ||
+      p.username === (location.state?.username || localStorage.getItem("username") || "Combatant").trim() ||
+      p.user?.username === (location.state?.username || localStorage.getItem("username") || "Combatant").trim() ||
+      p.userId === localStorage.getItem("userId")
+  )?.assignedProblemIndex || 0;
+
+  const [activeProblemIndex, setActiveProblemIndex] = useState(initialAssignedIndex);
   const [codeMap, setCodeMap] = useState({});
   const [opponentDraftCode, setOpponentDraftCode] = useState({});
 
@@ -148,6 +156,20 @@ const ContestPage = () => {
       [targetIndex]: myUsername
     }));
   };
+
+  // Automatically broadcast assigned problem claim on initial load for squad matches
+  const hasAutoClaimedRef = useRef(false);
+  useEffect(() => {
+    if (!battle || hasAutoClaimedRef.current || !problemsList.length) return;
+    const assignedIdx = myParticipant?.assignedProblemIndex;
+    if (assignedIdx !== undefined && assignedIdx !== null && assignedIdx >= 0 && assignedIdx < problemsList.length) {
+      hasAutoClaimedRef.current = true;
+      setActiveProblemIndex(assignedIdx);
+      if (myTeam !== "solo") {
+        handleClaimProblem(assignedIdx);
+      }
+    }
+  }, [battle, myParticipant, myTeam, problemsList.length]);
 
   // Handle switching between questions
   const handleSwitchProblem = (newIndex) => {

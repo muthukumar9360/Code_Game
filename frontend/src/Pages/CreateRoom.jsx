@@ -69,7 +69,7 @@ const CreateRoom = () => {
     }
   }, [navigate]);
 
-  // Adjust max participants when battleType changes
+  // Adjust max participants & minimum problem count when battleType changes
   useEffect(() => {
     const found = battleTypes.find(b => b.value === battleType);
     if (found) {
@@ -77,6 +77,10 @@ const CreateRoom = () => {
     }
     if (battleType === "contest") {
       setRequiresApproval(true);
+    }
+    const minProblems = battleType === "2vs2" ? 2 : (battleType === "4vs4" ? 4 : 1);
+    if (problemCount < minProblems) {
+      setProblemCount(minProblems);
     }
   }, [battleType]);
 
@@ -121,8 +125,9 @@ const CreateRoom = () => {
         return;
       }
 
-      if (selectionMode === "manual" && selectedSlugs.length === 0) {
-        setError("Please select at least 1 problem in manual mode or switch to random mode");
+      const minRequired = battleType === "2vs2" ? 2 : (battleType === "4vs4" ? 4 : 1);
+      if (selectionMode === "manual" && selectedSlugs.length < minRequired) {
+        setError(`Please select at least ${minRequired} problems for a ${battleType} battle so each squad member has a distinct challenge.`);
         setLoading(false);
         return;
       }
@@ -136,7 +141,7 @@ const CreateRoom = () => {
       const payload = {
         battleType,
         tier,
-        problemCount: Math.max(1, parseInt(problemCount) || 1),
+        problemCount: Math.max(minRequired, parseInt(problemCount) || minRequired),
         duration: totalDuration,
         selectionMode,
         selectedProblemSlugs: selectionMode === "manual" ? selectedSlugs : [],
@@ -408,7 +413,7 @@ const CreateRoom = () => {
                       <FaListOl /> Number of Problems
                     </label>
                     <div className="flex items-center gap-1">
-                      {[1, 2, 3, 5].map((preset) => (
+                      {(battleType === "2vs2" ? [2, 3, 4, 6] : battleType === "4vs4" ? [4, 6, 8, 10] : [1, 2, 3, 5]).map((preset) => (
                         <button
                           key={preset}
                           type="button"
@@ -432,11 +437,12 @@ const CreateRoom = () => {
                   <div className="relative flex items-center">
                     <input
                       type="number"
-                      min="1"
+                      min={battleType === "2vs2" ? 2 : (battleType === "4vs4" ? 4 : 1)}
                       max="20"
                       value={problemCount}
                       onChange={(e) => {
-                        const val = e.target.value === "" ? "" : Math.max(1, parseInt(e.target.value) || 1);
+                        const minAllowed = battleType === "2vs2" ? 2 : (battleType === "4vs4" ? 4 : 1);
+                        const val = e.target.value === "" ? "" : Math.max(minAllowed, parseInt(e.target.value) || minAllowed);
                         setProblemCount(val);
                         if (val !== "" && selectedSlugs.length > val) {
                           setSelectedSlugs(selectedSlugs.slice(0, val));
@@ -448,6 +454,11 @@ const CreateRoom = () => {
                       Problem{problemCount > 1 ? "s" : ""}
                     </span>
                   </div>
+                  {(battleType === "2vs2" || battleType === "4vs4") && (
+                    <span className="text-[10px] text-orange-400 font-mono mt-1.5 block">
+                      👥 Squad Directive: At least {battleType === "2vs2" ? "2" : "4"} challenges required so each teammate has a problem to claim.
+                    </span>
+                  )}
                 </div>
               </div>
 
