@@ -152,7 +152,15 @@ export const getBattleStatus = async (req, res) => {
     }
 
     const now = new Date();
-    const elapsed = battle.startTime ? Math.floor((now - battle.startTime) / 1000) : 0;
+    let startAnchor = battle.startTime;
+    if (!startAnchor && battle.status === 'active') {
+      startAnchor = battle.createdAt || now;
+      battle.startTime = startAnchor;
+      battle.save().catch(() => {});
+    }
+    const elapsed = startAnchor ? Math.max(0, Math.floor((now.getTime() - new Date(startAnchor).getTime()) / 1000)) : 0;
+    const totalDurationSec = (battle.duration || 30) * 60;
+    const computedRemaining = Math.max(0, totalDurationSec - elapsed);
 
     const formatProblem = (p) => {
       if (!p) return null;
@@ -179,8 +187,7 @@ export const getBattleStatus = async (req, res) => {
     }
 
     const mappedParticipants = battle.participants.map(p => {
-      const base = (p.timeLeft !== null && p.timeLeft !== undefined) ? p.timeLeft : (battle.duration || 30) * 60;
-      const timeLeft = Math.max(0, base - elapsed);
+      const timeLeft = computedRemaining;
       return {
         userId: participantUserId(p),
         user: (p.user && p.user.username) ? p.user.username : participantUserId(p),
@@ -208,7 +215,7 @@ export const getBattleStatus = async (req, res) => {
         problems: problemsPayload,
         problemCount: problemsPayload.length || battle.problemCount || 1,
         participants: mappedParticipants,
-        startTime: battle.startTime,
+        startTime: battle.startTime || startAnchor,
         endTime: battle.endTime,
         duration: battle.duration
       }
@@ -1393,9 +1400,11 @@ export const abandonBattle = async (req, res) => {
     }
 
     participant.result = 'lose';
+    let winningPlayer = null;
     for (const p of battle.participants) {
       if (participantUserId(p) !== userId) {
         p.result = 'win';
+        winningPlayer = p;
       }
     }
 
@@ -1403,18 +1412,27 @@ export const abandonBattle = async (req, res) => {
     battle.endTime = new Date();
     await battle.save();
 
+    await battle.populate('participants.user', 'username tier xp');
+
     const rewards = await awardBattleRewards(battle.participants, battle);
 
     const winner = battle.participants.find(p => p.result === 'win');
+    const winnerUsername = winner?.user?.username || winner?.username || winningPlayer?.user?.username || winningPlayer?.username || 'Opponent';
+    const winningTeam = winner?.team && winner.team !== 'solo' ? winner.team : (winningPlayer?.team && winningPlayer.team !== 'solo' ? winningPlayer.team : null);
+
     const io = req.app.get('io');
     if (io) {
-      io.to(battle.roomId).emit('battle-ended', {
-        battleId: battle._id,
+      const forfeitPayload = {
+        battleId: battle._id.toString(),
         roomId: battle.roomId,
-        winner: winner?.user?.username || winner?.username || null,
-        message: `${participant.user?.username || participant.username || 'A player'} forfeited the battle.`,
+        winner: winnerUsername,
+        winningTeam,
+        forfeitedBy: participant.user?.username || participant.username || 'A player',
+        message: `${participant.user?.username || participant.username || 'A player'} forfeited the battle. Victory awarded!`,
         rewards
-      });
+      };
+      io.to(battle.roomId).emit('battle-ended', forfeitPayload);
+      io.to(battle._id.toString()).emit('battle-ended', forfeitPayload);
     }
 
     res.json({

@@ -24,7 +24,7 @@ router.get("/categories", getProblemCategories);
 router.get("/daily", getDailyProblem);
 router.post("/daily/complete", authMiddleware, completeDailyProblem);
 router.get("/:slug", getProblemBySlug);
-router.post("/:slug/run", runPublicTestcases);
+router.post("/:slug/run", authMiddleware, runPublicTestcases);
 router.post("/:slug/submit", authMiddleware, submitPracticeSolution);
 router.post("/:slug/hint", authMiddleware, getProblemHint);
 router.post("/:slug/explain", authMiddleware, getCodeExplanation);

@@ -222,6 +222,12 @@ const ProblemSolve = () => {
   // Run Public Testcases (Does NOT mark problem as solved)
   const runTestcases = async () => {
     if (!problem) return;
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to run testcases and solve problems.");
+      navigate("/login");
+      return;
+    }
     setLoading(true);
     setResults([]);
     setDebugOutput("> RUN CODE: Executing against 3 Public Testcases...\n");
@@ -230,6 +236,8 @@ const ProblemSolve = () => {
       const res = await axios.post(`${API}/api/problems/${slug}/run`, {
         code,
         language
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
       });
 
       const data = res.data;
@@ -305,6 +313,11 @@ const ProblemSolve = () => {
     }
 
     const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to submit your solution.");
+      navigate("/login");
+      return;
+    }
     setSubmitLoading(true);
     setDebugOutput("> SUBMIT CODE: Evaluating solution against all Private Testcases...\n");
 
@@ -613,23 +626,29 @@ const ProblemSolve = () => {
             )}
 
             {/* ACTION BUTTONS */}
-            <div className="p-3 bg-black/40 border-t border-white/20 flex items-center justify-between gap-3 shrink-0">
-              <div className="flex items-center gap-2">
+            <div className="p-3 bg-black/40 border-t border-white/20 flex flex-wrap items-center justify-between gap-3 shrink-0">
+              <div className="flex items-center gap-2 flex-wrap">
                 <button
                   onClick={runTestcases}
                   disabled={loading}
-                  className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 border border-white/30 hover:border-white disabled:opacity-50"
+                  className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 border border-white/30 hover:border-white disabled:opacity-50 cursor-pointer"
                 >
                   <FaPlay className="text-[10px]" /> Run Tests
                 </button>
 
                 <button
                   onClick={() => setShowCustomModal(true)}
-                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 border border-white/30 hover:border-white"
+                  className="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 border border-white/30 hover:border-white cursor-pointer"
                   title="Run Custom Testcases"
                 >
                   <FaVial className="text-[10px]" /> Custom Testcases
                 </button>
+
+                {!localStorage.getItem("token") && (
+                  <span className="text-[11px] font-mono text-yellow-400 bg-yellow-500/10 border border-yellow-500/20 px-2.5 py-1 rounded-lg">
+                    🔒 Login required to solve & submit
+                  </span>
+                )}
               </div>
 
               <button

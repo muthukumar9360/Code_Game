@@ -79,6 +79,45 @@ io.on('connection', (socket) => {
     console.log(`User ${socket.id} left room ${roomId}`);
   });
 
+  socket.on('player-forfeit', async ({ roomId, contestId, username }) => {
+    try {
+      const query = [];
+      if (roomId) query.push({ roomId });
+      if (contestId && mongoose.isValidObjectId(contestId)) query.push({ _id: contestId });
+      if (query.length === 0) return;
+
+      const battle = await Battle.findOne({ $or: query }).populate('participants.user', 'username');
+      if (battle && battle.status !== 'finished') {
+        battle.status = 'finished';
+        battle.endTime = new Date();
+        let winningPlayer = null;
+        battle.participants.forEach(p => {
+          const uName = p.user?.username || p.username;
+          if (uName === username) {
+            p.result = 'lose';
+          } else {
+            p.result = 'win';
+            winningPlayer = p;
+          }
+        });
+        await battle.save();
+
+        const winnerName = winningPlayer?.user?.username || winningPlayer?.username || 'Opponent';
+        const payload = {
+          battleId: battle._id.toString(),
+          roomId: battle.roomId,
+          winner: winnerName,
+          forfeitedBy: username,
+          message: `${username} left or forfeited the contest. Victory awarded!`
+        };
+        io.to(battle.roomId).emit('battle-ended', payload);
+        io.to(battle._id.toString()).emit('battle-ended', payload);
+      }
+    } catch (e) {
+      console.error('Socket player-forfeit error:', e);
+    }
+  });
+
   socket.on('battle-update', (data) => {
     io.to(data.roomId).emit('battle-updated', data);
   });

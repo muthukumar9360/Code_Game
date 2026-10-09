@@ -15,7 +15,7 @@ import { FaShieldAlt, FaExpand, FaExclamationTriangle, FaLock, FaBan } from "rea
  * When false, the full-screen gateway modal and auto-termination listeners are paused.
  * Setting this to true re-activates the 100% strict lockdown.
  */
-export const STRICT_FULLSCREEN_LOCKDOWN = false;
+export const STRICT_FULLSCREEN_LOCKDOWN = true;
 
 export const useSecureProctoring = ({
   onTerminate,

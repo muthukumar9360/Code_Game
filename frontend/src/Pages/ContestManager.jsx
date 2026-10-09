@@ -35,7 +35,7 @@ const ContestManager = () => {
   const [successMsg, setSuccessMsg] = useState("");
   const [filterStatus, setFilterStatus] = useState("all"); // 'all' | 'waiting' | 'active' | 'finished'
   const [typeFilter, setTypeFilter] = useState("all"); // 'all' | 'point' | 'friendly'
-  const [viewScope, setViewScope] = useState("all"); // 'all' | 'mine' | 'participated'
+  const [viewScope, setViewScope] = useState("mine"); // 'mine' | 'created' | 'participated' | 'all' (defaults to user's contests only)
   const [searchTerm, setSearchTerm] = useState("");
 
   // Edit Modal State
@@ -249,11 +249,11 @@ const ContestManager = () => {
       (typeFilter === "point" && isPoint) ||
       (typeFilter === "friendly" && isFriendly);
 
-    // 3. Scope Filter (All vs My Created vs Participated)
+    // 3. Scope Filter (My Contests vs My Created vs Participated vs All)
     const matchesScope =
-      viewScope === "all"
-        ? true
-        : viewScope === "mine"
+      viewScope === "mine"
+        ? Boolean(c.isHost || c.isParticipant)
+        : viewScope === "created"
         ? Boolean(c.isHost)
         : viewScope === "participated"
         ? Boolean(c.isParticipant)
@@ -378,20 +378,20 @@ const ContestManager = () => {
         <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/10">
           <div className="flex items-center gap-1.5 bg-black/40 border border-white/20 rounded-xl p-1 text-xs font-mono">
             <button
-              onClick={() => setViewScope("all")}
-              className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                viewScope === "all" ? "bg-white/20 text-white font-bold" : "text-gray-400 hover:text-white"
-              }`}
-            >
-              All Arenas (Inc. Participated)
-            </button>
-            <button
               onClick={() => setViewScope("mine")}
               className={`px-3 py-1 rounded-lg transition cursor-pointer ${
-                viewScope === "mine" ? "bg-white/20 text-white font-bold" : "text-gray-400 hover:text-white"
+                viewScope === "mine" ? "bg-orange-500/30 text-orange-300 border border-orange-500/40 font-bold" : "text-gray-400 hover:text-white"
               }`}
             >
-              👑 My Created Only
+              👑 My Contests
+            </button>
+            <button
+              onClick={() => setViewScope("created")}
+              className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                viewScope === "created" ? "bg-white/20 text-white font-bold" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              🛠️ Created by Me
             </button>
             <button
               onClick={() => setViewScope("participated")}
@@ -399,7 +399,15 @@ const ContestManager = () => {
                 viewScope === "participated" ? "bg-white/20 text-white font-bold" : "text-gray-400 hover:text-white"
               }`}
             >
-              🎮 Participated by Me
+              🎮 Participated
+            </button>
+            <button
+              onClick={() => setViewScope("all")}
+              className={`px-3 py-1 rounded-lg transition cursor-pointer ${
+                viewScope === "all" ? "bg-white/20 text-white font-bold" : "text-gray-400 hover:text-white"
+              }`}
+            >
+              🌐 All Platform Contests
             </button>
           </div>
 

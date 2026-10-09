@@ -1,3 +1,4 @@
+import { topic0 } from "./topic0_fundamentals.js";
 import { topic1 } from "./topic1_arrays.js";
 import { topic2 } from "./topic2_two_pointers.js";
 import { topic3 } from "./topic3_sliding_window.js";
@@ -10,6 +11,7 @@ import { topic9 } from "./topic9_dp.js";
 import { topic10 } from "./topic10_greedy.js";
 
 export const topicsMeta = [
+  { id: 0, name: "Programming Fundamentals & Simple Codes", problems: topic0 },
   { id: 1, name: "Arrays & Hashing", problems: topic1 },
   { id: 2, name: "Two Pointers", problems: topic2 },
   { id: 3, name: "Sliding Window", problems: topic3 },
@@ -23,6 +25,7 @@ export const topicsMeta = [
 ];
 
 export const allProblems = [
+  ...topic0,
   ...topic1,
   ...topic2,
   ...topic3,

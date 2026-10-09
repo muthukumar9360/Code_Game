@@ -147,11 +147,21 @@ const DailyBlitz = () => {
     triggerViolation("Copy attempt detected in daily blitz workspace");
   };
 
+  // Mandatory Login Gate for Daily Challenge (DC/DT)
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token) {
+      alert("Please log in to participate in the Daily Challenge.");
+      navigate("/login");
+    }
+  }, [navigate]);
+
   // Fetch daily problem
   useEffect(() => {
     const fetchDaily = async () => {
       try {
         const token = localStorage.getItem("token");
+        if (!token) return;
         const res = await axios.get(`${API}/api/problems/daily`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         });

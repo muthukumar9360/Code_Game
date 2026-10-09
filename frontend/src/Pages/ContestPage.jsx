@@ -113,9 +113,16 @@ const ContestPage = () => {
   const myTeam = myParticipant?.team && myParticipant.team !== "solo"
     ? myParticipant.team
     : (isTeamMatch ? (location.state?.team || "A") : "solo");
-  const myTimeLeft = myParticipant?.timeLeft !== undefined && myParticipant?.timeLeft !== null
-    ? myParticipant.timeLeft
-    : (battle?.duration || 30) * 60;
+  const contestDurationSec = (battle?.duration || 30) * 60;
+  const startTimestamp = battle?.startTime ? new Date(battle.startTime).getTime() : null;
+  const computedElapsed = startTimestamp ? Math.max(0, Math.floor((Date.now() - startTimestamp) / 1000)) : 0;
+  const exactComputedTimeLeft = startTimestamp ? Math.max(0, contestDurationSec - computedElapsed) : null;
+
+  const myTimeLeft = exactComputedTimeLeft !== null
+    ? exactComputedTimeLeft
+    : (myParticipant?.timeLeft !== undefined && myParticipant?.timeLeft !== null
+      ? myParticipant.timeLeft
+      : contestDurationSec);
 
   const isRanked = Boolean(
     battle?.isRanked ||
@@ -353,7 +360,7 @@ const ContestPage = () => {
   const [alertMessage, setAlertMessage] = useState("");
   const [isWindowBlurred, setIsWindowBlurred] = useState(false);
   const lastKeyTimeRef = useRef(Date.now());
-  const maxStrikes = 3;
+  const maxStrikes = 1;
 
 
 
@@ -393,6 +400,17 @@ const ContestPage = () => {
       return;
     }
 
+    // Instantly notify rival through socket that this player forfeited/exited
+    if (socketRef.current) {
+      try {
+        socketRef.current.emit("player-forfeit", {
+          roomId: battle?.roomId || contestId,
+          contestId,
+          username: myUsername
+        });
+      } catch (e) {}
+    }
+
     const token = localStorage.getItem("token");
     try {
       await axios.post(
@@ -411,7 +429,7 @@ const ContestPage = () => {
         state: { opponentDraftCode }
       });
     }
-  }, [API, contestId, navigate, battle?.status, code, language, currentProblem, opponentDraftCode]);
+  }, [API, contestId, navigate, battle?.status, battle?.roomId, myUsername, code, language, currentProblem, opponentDraftCode]);
 
   // Squad Consensus Exit Click Handler
   const handleExitClick = () => {
@@ -551,6 +569,12 @@ const ContestPage = () => {
     });
 
     socketRef.current.emit("join-room", contestId);
+    if (battle?.roomId && battle.roomId !== contestId) {
+      socketRef.current.emit("join-room", battle.roomId);
+    }
+    if (battle?._id && battle._id.toString() !== contestId) {
+      socketRef.current.emit("join-room", battle._id.toString());
+    }
 
     if (isTeamMatch && myTeam !== "solo") {
       socketRef.current.emit("join-team-channel", {
@@ -664,6 +688,42 @@ const ContestPage = () => {
     };
   }, [contestId, API, navigate, myUsername, fetchBattleStatus, isTeamMatch, myTeam, handleExitBattle]);
 
+  // Live Active Match Heartbeat Poll (guarantees rival victory screen displays instantly on opponent exit even if socket delays)
+  useEffect(() => {
+    if (!battle || battle.status === "finished" || !contestId) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+        const res = await axios.get(`${API}/api/battles/${contestId}/status`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.data?.battle && res.data.battle.status === "finished") {
+          clearInterval(interval);
+          if (!popupShownRef.current) {
+            popupShownRef.current = true;
+            const myId = localStorage.getItem("userId");
+            const me = res.data.battle.participants?.find((p) =>
+              (p.userId && p.userId.toString() === myId) ||
+              p.user === myUsername ||
+              p.username === myUsername
+            );
+            const winnerPart = res.data.battle.participants?.find((p) => p.result === "win");
+            const isMeWinner = me?.result === "win" || (!me?.result && winnerPart?.user === myUsername);
+            setIsWinner(isMeWinner);
+            setWinnerName(winnerPart?.user?.username || winnerPart?.username || winnerPart?.user || myUsername);
+            setShowResultPopup(true);
+          }
+        }
+      } catch (e) {
+        // quiet poll
+      }
+    }, 2500);
+
+    return () => clearInterval(interval);
+  }, [battle?.status, contestId, API, myUsername]);
+
   // Countdown timer for MY time only (Standard Contests only; Ranked duels are sprints; paused during selection phase)
   useEffect(() => {
     if (!battle || battle.status === "finished" || isRanked || isSelectionPhase) return;
@@ -671,6 +731,10 @@ const ContestPage = () => {
       setBattle((prev) => {
         if (!prev) return prev;
         const copy = JSON.parse(JSON.stringify(prev));
+        const durSec = (copy.duration || 30) * 60;
+        const sTime = copy.startTime ? new Date(copy.startTime).getTime() : null;
+        const elapsedNow = sTime ? Math.max(0, Math.floor((Date.now() - sTime) / 1000)) : null;
+
         copy.participants = copy.participants.map((p) => {
           const isMe =
             p.user === myUsername ||
@@ -678,9 +742,12 @@ const ContestPage = () => {
             p.user?.username === myUsername ||
             (myTeam !== "solo" && p.team === myTeam);
           if (isMe) {
+            const nextTime = elapsedNow !== null
+              ? Math.max(0, durSec - elapsedNow)
+              : Math.max(0, (p.timeLeft !== undefined && p.timeLeft !== null ? p.timeLeft : durSec) - 1);
             return {
               ...p,
-              timeLeft: Math.max(0, (p.timeLeft !== undefined && p.timeLeft !== null ? p.timeLeft : 1800) - 1),
+              timeLeft: nextTime,
             };
           }
           return p;
@@ -689,7 +756,7 @@ const ContestPage = () => {
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [battle, myUsername, myTeam, isRanked]);
+  }, [battle?.status, battle?.startTime, battle?.duration, myUsername, myTeam, isRanked, isSelectionPhase]);
 
   // Run testcases locally via Judge0 (Public testcases only)
   const runTestcases = async () => {
@@ -907,6 +974,10 @@ const ContestPage = () => {
 
   return (
     <div
+      onCopy={handleCopyBlocked}
+      onCut={handleCopyBlocked}
+      onPaste={handlePasteBlocked}
+      onContextMenu={(e) => e.preventDefault()}
       className={`h-screen max-h-screen flex flex-col bg-[#050b10] text-white font-sans select-none overflow-hidden ${
         isWindowBlurred ? "filter blur-sm" : ""
       }`}
