@@ -157,7 +157,16 @@ const ProblemSolve = () => {
     navigate("/problems");
   }, [navigate]);
 
-  const { isFullscreen, enterFullscreen, triggerViolation } = useSecureProctoring({
+  const {
+    isFullscreen,
+    warningActive,
+    warningCountdown,
+    warningReason,
+    warningCount,
+    maxWarnings,
+    enterFullscreen,
+    triggerViolation
+  } = useSecureProctoring({
     onTerminate: handleSecurityTermination,
     enabled: true,
     environmentName: "Practice Arena"
@@ -424,9 +433,14 @@ const ProblemSolve = () => {
         }
       `}</style>
 
-      {/* MANDATORY FULLSCREEN GATEWAY */}
+      {/* MANDATORY FULLSCREEN GATEWAY & SKILLRACK WARNING */}
       <FullscreenGatewayModal
         isFullscreen={isFullscreen}
+        warningActive={warningActive}
+        warningCountdown={warningCountdown}
+        warningReason={warningReason}
+        warningCount={warningCount}
+        maxWarnings={maxWarnings}
         onEnterFullscreen={enterFullscreen}
         environmentName="Practice Arena"
       />

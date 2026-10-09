@@ -7,13 +7,12 @@ const router = express.Router();
 router.post("/login", (req, res) => {
   const { username, password } = req.body;
 
-  const validUsername = process.env.ADMIN_USERNAME || "admin";
-  const validPassword = process.env.ADMIN_PASSWORD || "admin";
+  const validUsername = process.env.ADMIN_USERNAME || "muthukumar_9360";
+  const validPassword = process.env.ADMIN_PASSWORD || "Muthukumar12";
 
   const isMatch =
     (username === validUsername && password === validPassword) ||
-    (username === "admin" && password === "admin") ||
-    (username === "SMDF" && password === "SMDF");
+    (username === "muthukumar_9360" && password === "Muthukumar12");
 
   if (!isMatch) {
     return res.status(401).json({ message: "Invalid Admin Credentials" });

@@ -17,7 +17,8 @@ import {
   FaUser,
   FaLock,
   FaHourglassHalf,
-  FaShieldAlt
+  FaShieldAlt,
+  FaRedo
 } from "react-icons/fa";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { io } from "socket.io-client";
@@ -284,27 +285,118 @@ const ContestPage = () => {
     }
   }, [battle, myParticipant, myTeam, problemsList.length]);
 
+  // Draft Saving and Persistence across refreshes, problem switches, and network errors
+  const [saveStatus, setSaveStatus] = useState("");
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+
+  const getDraftStorageKey = useCallback((probId, lang) => {
+    const cKey = contestId || battle?.roomId || battle?._id || "active_contest";
+    const uKey = localStorage.getItem("userId") || myUsername;
+    return `battlix_draft_${cKey}_${uKey}_${probId}_${lang}`;
+  }, [contestId, battle?.roomId, battle?._id, myUsername]);
+
+  const loadDraftForProblem = useCallback((probId, lang) => {
+    const sKey = getDraftStorageKey(probId, lang);
+    const localVal = localStorage.getItem(sKey);
+    if (localVal && localVal.trim()) return localVal;
+
+    const serverVal = battle?.myDrafts?.[probId];
+    if (serverVal && serverVal.trim()) return serverVal;
+
+    if (codeMap[probId]?.[lang]) return codeMap[probId][lang];
+
+    return STARTER_CODES[lang] || "";
+  }, [getDraftStorageKey, battle?.myDrafts, codeMap]);
+
+  const handleSaveDraft = useCallback(async (explicit = true) => {
+    const curProblem = problemsList[safeActiveIndex];
+    const curId = curProblem?._id || `prob_${safeActiveIndex}`;
+    const sKey = getDraftStorageKey(curId, language);
+
+    setIsSavingDraft(true);
+    // 1. Local storage save (guarantees survival through F5 / refresh)
+    try {
+      localStorage.setItem(sKey, code);
+      setCodeMap(prev => ({
+        ...prev,
+        [curId]: {
+          ...(prev[curId] || {}),
+          [language]: code
+        }
+      }));
+    } catch (e) {
+      console.warn("Local storage draft write error:", e);
+    }
+
+    // 2. Persist to cloud backend
+    const token = localStorage.getItem("token");
+    const activeContestId = contestId || battle?.roomId || battle?._id;
+    if (token && activeContestId && code) {
+      axios.post(
+        `${API}/api/battles/${activeContestId}/save-draft`,
+        {
+          problemId: curId,
+          code,
+          language
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      ).catch(() => {});
+    }
+
+    setIsSavingDraft(false);
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    setSaveStatus(`Saved ${timeStr}`);
+
+    if (explicit) {
+      setDebugOutput(prev => prev + `> 💾 [DRAFT PRESERVED] Code saved for Challenge #${safeActiveIndex + 1} (${timeStr})\n`);
+    }
+  }, [problemsList, safeActiveIndex, getDraftStorageKey, language, code, contestId, battle?.roomId, battle?._id, API]);
+
+  // Initial draft load on problem switch or initial mount
+  useEffect(() => {
+    if (!currentProblem) return;
+    const curId = currentProblem._id || `prob_${safeActiveIndex}`;
+    const initialCode = loadDraftForProblem(curId, language);
+    if (initialCode && initialCode !== code) {
+      setCode(initialCode);
+    }
+  }, [safeActiveIndex, currentProblem, language]);
+
+  // Auto-save on page refresh/close (beforeunload)
+  useEffect(() => {
+    const onBeforeUnload = () => {
+      const curProblem = problemsList[safeActiveIndex];
+      const curId = curProblem?._id || `prob_${safeActiveIndex}`;
+      const sKey = getDraftStorageKey(curId, language);
+      if (code) {
+        localStorage.setItem(sKey, code);
+      }
+    };
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => window.removeEventListener("beforeunload", onBeforeUnload);
+  }, [problemsList, safeActiveIndex, getDraftStorageKey, language, code]);
+
+  // Periodic background auto-save every 15s
+  useEffect(() => {
+    const timer = setInterval(() => {
+      if (code && code.trim()) {
+        handleSaveDraft(false);
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [code, handleSaveDraft]);
 
   // Handle switching between questions
   const handleSwitchProblem = (newIndex) => {
     if (newIndex === safeActiveIndex || newIndex < 0 || newIndex >= problemsList.length) return;
 
-    const curProblem = problemsList[safeActiveIndex];
-    const curId = curProblem?._id || `prob_${safeActiveIndex}`;
-
-    // Save current editor code
-    setCodeMap((prev) => ({
-      ...prev,
-      [curId]: {
-        ...(prev[curId] || {}),
-        [language]: code
-      }
-    }));
+    // First, save current problem's draft
+    handleSaveDraft(false);
 
     // Switch to new problem and restore its code
     const nextProblem = problemsList[newIndex];
     const nextId = nextProblem?._id || `prob_${newIndex}`;
-    const nextCode = codeMap[nextId]?.[language] || STARTER_CODES[language] || "";
+    const nextCode = loadDraftForProblem(nextId, language);
 
     setActiveProblemIndex(newIndex);
     setCode(nextCode);
@@ -324,21 +416,13 @@ const ContestPage = () => {
     const curProblem = problemsList[safeActiveIndex];
     const curId = curProblem?._id || `prob_${safeActiveIndex}`;
 
-    setCodeMap((prev) => ({
-      ...prev,
-      [curId]: {
-        ...(prev[curId] || {}),
-        [language]: code
-      }
-    }));
+    // Save for current language
+    handleSaveDraft(false);
 
-    const savedForNewLang = codeMap[curId]?.[newLang];
+    // Load code for new language
+    const nextCode = loadDraftForProblem(curId, newLang);
     setLanguage(newLang);
-    if (savedForNewLang) {
-      setCode(savedForNewLang);
-    } else {
-      setCode(STARTER_CODES[newLang] || "");
-    }
+    setCode(nextCode);
   };
 
   // Draggable Middle Divider Split State
@@ -501,7 +585,16 @@ const ContestPage = () => {
     handleExitBattle(true);
   }, [handleExitBattle]);
 
-  const { isFullscreen, enterFullscreen, triggerViolation } = useSecureProctoring({
+  const {
+    isFullscreen,
+    warningActive,
+    warningCountdown,
+    warningReason,
+    warningCount,
+    maxWarnings,
+    enterFullscreen,
+    triggerViolation
+  } = useSecureProctoring({
     onTerminate: handleSecurityTermination,
     enabled: true,
     environmentName: isRanked ? "Ranked 1v1 Battle" : "Contest Arena"
@@ -998,9 +1091,14 @@ const ContestPage = () => {
         }
       `}</style>
 
-      {/* MANDATORY FULLSCREEN GATEWAY */}
+      {/* MANDATORY FULLSCREEN GATEWAY & SKILLRACK WARNING */}
       <FullscreenGatewayModal
         isFullscreen={isFullscreen}
+        warningActive={warningActive}
+        warningCountdown={warningCountdown}
+        warningReason={warningReason}
+        warningCount={warningCount}
+        maxWarnings={maxWarnings}
         onEnterFullscreen={enterFullscreen}
         environmentName={isRanked ? "Ranked 1v1 Battle" : "Contest Arena"}
       />
@@ -1108,6 +1206,22 @@ const ContestPage = () => {
             <span className="text-gray-400 hidden sm:inline">User:</span>
             <span className="text-white font-bold tracking-wide">{myUsername}</span>
           </div>
+
+          {/* IN-PAGE NODE REFRESH & SYNC (WITHOUT LEAVING FULLSCREEN) */}
+          <button
+            onClick={async () => {
+              await fetchBattleStatus();
+              if (socketRef.current && contestId) {
+                socketRef.current.emit("join-room", contestId);
+              }
+              handleSaveDraft(false);
+              setDebugOutput((prev) => prev + `> 🔄 [NODE SYNC] Telemetry resynchronized with live battle node.\n`);
+            }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/20 hover:border-white text-xs font-mono transition cursor-pointer"
+            title="Refresh match telemetry and sync node without exiting fullscreen"
+          >
+            <FaRedo className="text-[10px]" /> <span className="hidden sm:inline">Sync Node</span>
+          </button>
 
           {/* SQUAD TEAM VOICE & TACTICAL CHAT (IF TEAM MATCH) */}
           {(myTeam !== "solo" || isTeamMatch) && (
@@ -1544,18 +1658,35 @@ const ContestPage = () => {
 
             {/* ACTION BUTTONS */}
             <div className="p-3 bg-black/40 border-t border-white/20 flex items-center justify-between gap-3 shrink-0">
-              <button
-                onClick={runTestcases}
-                disabled={loading}
-                className="px-5 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 border border-white/30 hover:border-white disabled:opacity-50"
-              >
-                <FaPlay className="text-[10px]" /> Run Tests
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={runTestcases}
+                  disabled={loading}
+                  className="px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold uppercase tracking-wider transition flex items-center gap-2 border border-white/30 hover:border-white disabled:opacity-50 cursor-pointer"
+                >
+                  <FaPlay className="text-[10px]" /> Run Tests
+                </button>
+
+                <button
+                  onClick={() => handleSaveDraft(true)}
+                  disabled={isSavingDraft}
+                  className="px-4 py-2.5 bg-blue-600/20 hover:bg-blue-600/35 text-blue-300 hover:text-white rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-2 border border-blue-500/40 hover:border-blue-400 disabled:opacity-50 cursor-pointer shadow-sm"
+                  title="Save code draft locally and to cloud node"
+                >
+                  💾 Save Code
+                </button>
+
+                {saveStatus && (
+                  <span className="hidden sm:inline text-[11px] font-mono text-emerald-400/90 font-medium">
+                    ✓ {saveStatus}
+                  </span>
+                )}
+              </div>
 
               <button
                 onClick={submitSolution}
                 disabled={loading}
-                className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-black font-black text-xs uppercase tracking-[0.2em] rounded-xl transition hover:scale-105 active:scale-95 shadow-lg flex items-center gap-2 border border-white/20 disabled:opacity-50"
+                className="px-6 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-400 hover:to-amber-400 text-black font-black text-xs uppercase tracking-[0.2em] rounded-xl transition hover:scale-105 active:scale-95 shadow-lg flex items-center gap-2 border border-white/20 disabled:opacity-50 cursor-pointer"
               >
                 Submit Solution
               </button>

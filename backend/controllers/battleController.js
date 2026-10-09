@@ -146,9 +146,26 @@ export const getBattleStatus = async (req, res) => {
       return (pUid && pUid.toString() === (userId || '').toString()) ||
              (p.user?.username && req.user?.username && p.user.username === req.user.username);
     });
+    const isHost = (battle.creator && battle.creator.toString() === (userId || '').toString()) ||
+                   (battle.participants.length > 0 && participantUserId(battle.participants[0]) === (userId || '').toString());
 
-    if (!isParticipant && !battle.isRanked) {
-      return res.status(403).json({ error: 'Not a participant in this battle' });
+    if (!isParticipant && !isHost && !battle.isRanked) {
+      return res.status(403).json({ error: 'Not an authorized participant or host in this battle' });
+    }
+
+    const myParticipant = battle.participants.find(p => {
+      const pUid = participantUserId(p);
+      return (pUid && pUid.toString() === (userId || '').toString()) ||
+             (p.user?.username && req.user?.username && p.user.username === req.user.username);
+    });
+
+    const myDrafts = {};
+    if (myParticipant?.drafts) {
+      if (myParticipant.drafts instanceof Map) {
+        myParticipant.drafts.forEach((v, k) => { myDrafts[k] = v; });
+      } else if (typeof myParticipant.drafts === 'object') {
+        Object.assign(myDrafts, myParticipant.drafts);
+      }
     }
 
     const now = new Date();
@@ -222,7 +239,11 @@ export const getBattleStatus = async (req, res) => {
         startTime: battle.startTime || startAnchor,
         endTime: battle.endTime,
         duration: isUntimed ? 0 : battle.duration,
-        isUntimed
+        isUntimed,
+        isHost,
+        myDrafts,
+        myLastCode: myParticipant?.lastCode || '',
+        myLastLanguage: myParticipant?.lastLanguage || 'python'
       }
     });
 
@@ -421,12 +442,30 @@ export const joinRoom = async (req, res) => {
       return res.status(404).json({ error: 'Room not found' });
     }
 
+    const isParticipant = battle.participants.some(p => participantUserId(p) === userId);
+    const isHost = (battle.creator && battle.creator.toString() === userId) ||
+                   (battle.participants.length > 0 && participantUserId(battle.participants[0]) === userId);
+
+    if (battle.status === 'finished') {
+      return res.status(400).json({ error: 'This battle has already concluded.' });
+    }
+
     if (battle.status !== 'waiting') {
-      return res.status(400).json({ error: 'Battle already started' });
+      // Contest is ongoing: Strictly allow ONLY already-joined approved participants and host to resume!
+      if (!isParticipant && !isHost) {
+        return res.status(403).json({
+          error: 'Contest has already started. New participants cannot join an ongoing contest.'
+        });
+      }
+
+      const existing = battle.participants.find(p => participantUserId(p) === userId);
+      if (existing && existing.approvalStatus === 'rejected') {
+        return res.status(403).json({ error: 'Your clearance request was declined by the tournament admin.' });
+      }
     }
 
     // Password validation for hackathons / corporate rooms
-    if (battle.accessPassword) {
+    if (battle.accessPassword && !isParticipant && !isHost) {
       const provided = (req.body?.password || req.query?.password || '').trim();
       if (!provided || provided !== battle.accessPassword) {
         return res.status(403).json({
@@ -436,11 +475,19 @@ export const joinRoom = async (req, res) => {
       }
     }
 
-    const isParticipant = battle.participants.some(p => participantUserId(p) === userId);
     if (isParticipant) {
       const existing = battle.participants.find(p => participantUserId(p) === userId);
       if (existing?.approvalStatus === 'rejected') {
         return res.status(403).json({ error: 'Your clearance request was declined by the tournament admin.' });
+      }
+
+      const draftsObj = {};
+      if (existing?.drafts) {
+        if (existing.drafts instanceof Map) {
+          existing.drafts.forEach((v, k) => { draftsObj[k] = v; });
+        } else if (typeof existing.drafts === 'object') {
+          Object.assign(draftsObj, existing.drafts);
+        }
       }
 
       return res.json({
@@ -456,6 +503,12 @@ export const joinRoom = async (req, res) => {
           isTournament: battle.isTournament,
           requiresApproval: battle.requiresApproval,
           myApprovalStatus: existing?.approvalStatus || 'approved',
+          isHost,
+          myDrafts: draftsObj,
+          lastCode: existing?.lastCode || '',
+          lastLanguage: existing?.lastLanguage || 'python',
+          startTime: battle.startTime,
+          isUntimed: battle.isUntimed,
           participants: battle.participants.map(p => ({
             userId: participantUserId(p),
             user: p.user?.username || participantUserId(p),
@@ -1957,4 +2010,58 @@ export const stopContest = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Save draft code for a problem in an ongoing battle/contest
+export const saveBattleDraft = async (req, res) => {
+  try {
+    const { battleId } = req.params;
+    const { problemId, code, language } = req.body;
+    const userId = req.user.id;
+
+    const battle = await resolveBattle(battleId);
+    if (!battle) {
+      return res.status(404).json({ error: 'Battle room not found.' });
+    }
+
+    const participant = battle.participants.find(p => {
+      const pUid = participantUserId(p);
+      return (pUid && pUid.toString() === (userId || '').toString()) ||
+             (p.user?.username && req.user?.username && p.user.username === req.user.username);
+    });
+
+    if (!participant) {
+      return res.status(403).json({ error: 'Not a registered participant in this contest.' });
+    }
+
+    if (code !== undefined) {
+      participant.lastCode = code;
+      if (!participant.drafts) {
+        participant.drafts = new Map();
+      }
+      if (problemId) {
+        if (participant.drafts.set) {
+          participant.drafts.set(problemId.toString(), code);
+        } else {
+          participant.drafts[problemId.toString()] = code;
+        }
+      }
+    }
+
+    if (language) {
+      participant.lastLanguage = language;
+    }
+
+    await battle.save();
+
+    res.json({
+      success: true,
+      message: 'Draft code saved securely to cloud node.',
+      savedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Save draft error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
 

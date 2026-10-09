@@ -242,6 +242,50 @@ export const deleteProblem = async (req, res) => {
   }
 };
 
+export const updateProblem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      slug,
+      difficulty,
+      description,
+      examples,
+      constraints,
+      topics,
+      companies,
+      hints,
+      testcases
+    } = req.body;
+
+    const problem = await Problem.findById(id);
+    if (!problem) {
+      return res.status(404).json({ error: "Problem not found" });
+    }
+
+    if (title !== undefined) problem.title = title;
+    if (slug !== undefined && slug.trim()) problem.slug = slug.trim().toLowerCase().replace(/\s+/g, '-');
+    if (difficulty !== undefined) problem.difficulty = difficulty.toLowerCase();
+    if (description !== undefined) problem.description = description;
+    if (examples !== undefined) problem.examples = examples;
+    if (constraints !== undefined) problem.constraints = constraints;
+    if (topics !== undefined) problem.topics = topics;
+    if (companies !== undefined) problem.companies = companies;
+    if (hints !== undefined) problem.hints = hints;
+    if (testcases !== undefined) problem.testcases = testcases;
+
+    await problem.save();
+
+    res.json({
+      success: true,
+      message: "Problem updated successfully",
+      data: problem
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+};
+
 // Run Public Testcases (Used for "Run Tests" / "Run Code")
 export const runPublicTestcases = async (req, res) => {
   try {

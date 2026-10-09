@@ -131,7 +131,16 @@ const DailyBlitz = () => {
     navigate("/");
   }, [navigate]);
 
-  const { isFullscreen, enterFullscreen, triggerViolation } = useSecureProctoring({
+  const {
+    isFullscreen,
+    warningActive,
+    warningCountdown,
+    warningReason,
+    warningCount,
+    maxWarnings,
+    enterFullscreen,
+    triggerViolation
+  } = useSecureProctoring({
     onTerminate: handleSecurityTermination,
     enabled: true,
     environmentName: "Daily Blitz Challenge"
@@ -287,9 +296,14 @@ const DailyBlitz = () => {
         }
       `}</style>
 
-      {/* MANDATORY FULLSCREEN GATEWAY */}
+      {/* MANDATORY FULLSCREEN GATEWAY & SKILLRACK WARNING */}
       <FullscreenGatewayModal
         isFullscreen={isFullscreen}
+        warningActive={warningActive}
+        warningCountdown={warningCountdown}
+        warningReason={warningReason}
+        warningCount={warningCount}
+        maxWarnings={maxWarnings}
         onEnterFullscreen={enterFullscreen}
         environmentName="Daily Blitz Challenge"
       />

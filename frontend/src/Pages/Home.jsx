@@ -7,7 +7,8 @@ import {
   FaTrophy,
   FaUsers,
   FaBolt,
-  FaDownload
+  FaDownload,
+  FaShieldAlt
 } from "react-icons/fa";
 import { io } from "socket.io-client";
 import RankedMatchModal from "../Components/RankedMatchModal.jsx";
@@ -112,6 +113,17 @@ const Home = () => {
             </button>
           )}
 
+          {/* ADMIN LOGIN BUTTON */}
+          <button
+            onClick={() => navigate("/admin/login")}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-600/30 to-orange-600/30 hover:from-red-600 hover:to-orange-600 border border-red-500/50 hover:border-orange-400 text-red-200 hover:text-white rounded-xl text-xs font-mono font-bold transition shadow-[0_0_15px_rgba(239,68,68,0.25)] hover:shadow-[0_0_20px_rgba(249,115,22,0.5)] cursor-pointer"
+            title="Administrator Control Console"
+          >
+            <FaShieldAlt className="text-red-400 text-xs shrink-0" />
+            <span className="hidden sm:inline">Admin Login</span>
+            <span className="sm:hidden">Admin</span>
+          </button>
+
           {/* USER ICON */}
           <div className="relative">
             <button 
@@ -127,6 +139,9 @@ const Home = () => {
                   <>
                     <button onClick={() => navigate("/login")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">Login</button>
                     <button onClick={() => navigate("/signup")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">Sign Up</button>
+                    <button onClick={() => navigate("/admin/login")} className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-400 hover:text-red-300 transition text-xs font-mono flex items-center gap-2 border-t border-white/10">
+                      <FaShieldAlt size={12} /> Admin Login
+                    </button>
                   </>
                 ) : (
                   <>
@@ -136,6 +151,9 @@ const Home = () => {
                     </div>
                     <button onClick={() => navigate("/contest-management")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs font-mono text-orange-400">Contest Manager</button>
                     <button onClick={() => navigate("/profile")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">My Profile</button>
+                    <button onClick={() => navigate("/admin/login")} className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-400 hover:text-red-300 transition text-xs font-mono flex items-center gap-2 border-t border-white/10">
+                      <FaShieldAlt size={12} /> Admin Portal
+                    </button>
                     <button onClick={logout} className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 transition text-xs font-bold">Logout</button>
                   </>
                 )}

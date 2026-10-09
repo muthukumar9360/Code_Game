@@ -1,12 +1,12 @@
 import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaEye, FaEyeSlash, FaShieldAlt, FaTerminal } from "react-icons/fa";
+import { FaEye, FaEyeSlash, FaShieldAlt, FaTerminal, FaServer, FaLock, FaCheckCircle, FaUserCheck } from "react-icons/fa";
 import { jwtDecode } from "jwt-decode";
 import BackButton from "../Components/BackButton.jsx";
 
 const AdminLogin = () => {
-  const [username, setUsername] = useState("admin");
-  const [password, setPassword] = useState("admin");
+  const [username, setUsername] = useState("muthukumar_9360");
+  const [password, setPassword] = useState("Muthukumar12");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -25,7 +25,7 @@ const AdminLogin = () => {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ username, password }),
+        body: JSON.stringify({ username: username.trim(), password: password.trim() }),
       });
 
       const data = await res.json();
@@ -36,9 +36,9 @@ const AdminLogin = () => {
       }
 
       localStorage.setItem("adminToken", data.token);
-      localStorage.setItem("adminUsername", username);
+      localStorage.setItem("adminUsername", username.trim());
       const decode = jwtDecode(data.token);
-      localStorage.setItem("Role", decode.role);
+      localStorage.setItem("Role", decode.role || "admin");
 
       navigate("/admin/home");
     } catch (err) {
@@ -50,81 +50,135 @@ const AdminLogin = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#050b10] text-white p-4 font-sans relative">
-      {/* GLOWS */}
-      <div className="fixed top-[-10%] right-[-10%] w-[400px] h-[400px] bg-orange-600/15 blur-[130px] rounded-full pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] left-[-10%] w-[400px] h-[400px] bg-blue-600/15 blur-[130px] rounded-full pointer-events-none"></div>
+    <div className="min-h-screen w-full flex flex-col justify-start bg-[#050b10] text-white p-4 sm:p-8 font-sans relative">
+      {/* BACKGROUND ACCENTS */}
+      <div className="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-600/10 blur-[150px] rounded-full pointer-events-none"></div>
+      <div className="fixed bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-600/10 blur-[150px] rounded-full pointer-events-none"></div>
 
-      {/* TOP BAR WITH BACK BUTTON */}
-      <div className="w-full max-w-[420px] flex justify-start mb-6 z-20">
-        <BackButton to="/" label="Exit to Home" />
+      {/* TOP HEADER BAR */}
+      <div className="w-full flex justify-between items-center mb-8 z-20 pb-4 border-b border-white/10">
+        <BackButton to="/" label="Exit to Battlix Home" />
+        <div className="flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+          <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
+            Security Node // Port 443
+          </span>
+        </div>
       </div>
 
-      <div className="w-full max-w-[420px] bg-[#0a1118]/90 border border-white/10 p-8 rounded-2xl shadow-2xl relative z-10 backdrop-blur-xl">
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 text-orange-400 text-[11px] font-mono uppercase tracking-widest px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 mb-2">
-            <FaTerminal /> Operator Core
+      {/* FULL-WIDTH OPERATOR CONSOLE CONTAINER */}
+      <div className="w-full max-w-6xl mx-auto flex-1 flex flex-col justify-center items-center z-10">
+        <div className="w-full grid grid-cols-1 lg:grid-cols-12 gap-8 bg-[#0a1118]/90 border border-white/15 rounded-3xl p-6 sm:p-10 shadow-2xl backdrop-blur-2xl">
+          
+          {/* LEFT SYSTEM HERO / OPERATOR CLEARANCE INFO (LG: 7 COLS) */}
+          <div className="lg:col-span-7 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 pb-8 lg:pb-0 lg:pr-10">
+            <div>
+              <div className="inline-flex items-center gap-2 text-red-400 text-xs font-mono uppercase tracking-widest px-3.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 mb-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                <FaShieldAlt /> Authorized Personnel Only
+              </div>
+
+              <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight italic text-white mb-4">
+                BATT<span className="text-orange-500">LIX</span> <span className="text-red-500">ADMIN</span>
+              </h1>
+
+              <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6 font-sans">
+                Full administrative gateway for the Battlix Competitive Ecosystem. Manage algorithm test suites, live tournaments, problem specifications, and user permissions across all clusters.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
+                <div className="bg-black/50 border border-white/10 p-3.5 rounded-2xl flex items-start gap-3">
+                  <FaServer className="text-orange-400 mt-1 shrink-0 text-lg" />
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase font-mono">Problem Engineering</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Edit problem testcases, hints, topics, and descriptions live.</p>
+                  </div>
+                </div>
+
+                <div className="bg-black/50 border border-white/10 p-3.5 rounded-2xl flex items-start gap-3">
+                  <FaLock className="text-red-400 mt-1 shrink-0 text-lg" />
+                  <div>
+                    <h4 className="text-xs font-bold text-white uppercase font-mono">Arena Control</h4>
+                    <p className="text-[11px] text-gray-400 mt-0.5">Monitor multi-question contests, extend times, and oversee rooms.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl font-mono text-xs space-y-1">
+              <div className="flex items-center gap-2 text-gray-300">
+                <FaCheckCircle className="text-emerald-400" />
+                <span>Default Operator ID: <strong className="text-orange-400">muthukumar_9360</strong></span>
+              </div>
+              <div className="flex items-center gap-2 text-gray-300">
+                <FaUserCheck className="text-emerald-400" />
+                <span>Security Token: <strong className="text-orange-400">••••••••••••</strong></span>
+              </div>
+            </div>
           </div>
-          <h2 className="text-3xl font-black uppercase italic tracking-tight">
-            ADMIN <span className="text-orange-500">TERMINAL</span>
-          </h2>
-          <p className="text-gray-400 text-xs mt-1">Authenticate to access system operations</p>
+
+          {/* RIGHT LOGIN FORM (LG: 5 COLS) */}
+          <div className="lg:col-span-5 flex flex-col justify-center">
+            <div className="mb-6">
+              <div className="flex items-center gap-2 text-orange-400 text-xs font-mono uppercase tracking-widest mb-1">
+                <FaTerminal /> Terminal Access
+              </div>
+              <h2 className="text-2xl font-black uppercase text-white">Operator Sign-In</h2>
+              <p className="text-gray-400 text-xs">Enter your administrative credentials</p>
+            </div>
+
+            {error && (
+              <div className="p-3.5 bg-red-500/15 border border-red-500/40 rounded-xl text-red-300 text-xs mb-5 flex items-center gap-2.5 animate-shake">
+                <FaShieldAlt className="shrink-0 text-sm" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form className="flex flex-col gap-4" onSubmit={handleAdminLogin}>
+              <div>
+                <label className="text-[10px] uppercase font-bold tracking-widest text-gray-400 block mb-1.5 font-mono">
+                  Administrator Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="muthukumar_9360"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="w-full bg-black/60 border border-white/15 focus:border-orange-500 rounded-xl px-4 py-3 text-white outline-none font-mono text-sm transition"
+                  required
+                />
+              </div>
+
+              <div className="relative">
+                <label className="text-[10px] uppercase font-bold tracking-widest text-gray-400 block mb-1.5 font-mono">
+                  Administrator Password
+                </label>
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Muthukumar12"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full bg-black/60 border border-white/15 focus:border-orange-500 rounded-xl px-4 py-3 text-white outline-none font-mono text-sm pr-12 transition"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-9 text-gray-400 hover:text-white transition cursor-pointer"
+                >
+                  {showPassword ? <FaEyeSlash size={16} /> : <FaEye size={16} />}
+                </button>
+              </div>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3.5 mt-2 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black font-mono text-sm uppercase tracking-wider rounded-xl transition shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+              >
+                {loading ? "Authorizing Operator..." : "Authorize Admin Access →"}
+              </button>
+            </form>
+          </div>
         </div>
-
-        {error && (
-          <div className="p-3 bg-red-500/15 border border-red-500/40 rounded-xl text-red-300 text-xs mb-4 flex items-center gap-2">
-            <FaShieldAlt /> {error}
-          </div>
-        )}
-
-        <form className="flex flex-col gap-4" onSubmit={handleAdminLogin}>
-          <div>
-            <label className="text-[10px] uppercase font-bold tracking-widest text-gray-400 block mb-1">
-              Admin Username
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. admin"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-orange-500 font-mono text-sm"
-              required
-            />
-          </div>
-
-          <div className="relative">
-            <label className="text-[10px] uppercase font-bold tracking-widest text-gray-400 block mb-1">
-              Admin Password
-            </label>
-            <input
-              type={showPassword ? "text" : "password"}
-              placeholder="e.g. admin"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full bg-black/50 border border-white/10 rounded-xl px-4 py-2.5 text-white outline-none focus:border-orange-500 font-mono text-sm pr-11"
-              required
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3.5 top-8 text-gray-400 hover:text-white"
-            >
-              {showPassword ? <FaEyeSlash /> : <FaEye />}
-            </button>
-          </div>
-
-          <div className="text-[10px] text-gray-500 font-mono bg-white/5 p-2.5 rounded-lg border border-white/5">
-            Default credentials: <strong className="text-orange-400">admin</strong> / <strong className="text-orange-400">admin</strong>
-          </div>
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full mt-2 bg-orange-500 hover:bg-orange-400 text-black font-black py-3 rounded-xl uppercase tracking-widest text-xs transition active:scale-95 shadow-lg disabled:opacity-50"
-          >
-            {loading ? "AUTHENTICATING..." : "AUTHENTICATE"}
-          </button>
-        </form>
       </div>
     </div>
   );

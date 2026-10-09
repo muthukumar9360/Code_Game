@@ -8,6 +8,7 @@ import {
   getProblemCategories,
   getProblemBySlug,
   deleteProblem,
+  updateProblem,
   runPublicTestcases,
   submitPracticeSolution,
   getProblemHint,
@@ -32,6 +33,8 @@ router.post("/:slug/explain", authMiddleware, getCodeExplanation);
 // Admin routes
 router.post("/createProblem", adminAuth, createProblem);
 router.get("/admin/allproblems", adminAuth, getAllProblemsForAdmin);
+router.put("/admin/:id", adminAuth, updateProblem);
+router.post("/admin/:id/update", adminAuth, updateProblem);
 router.delete("/admin/:id", adminAuth, deleteProblem);
 
 export default router;

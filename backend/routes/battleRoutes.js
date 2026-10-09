@@ -19,7 +19,8 @@ import {
   getHackathonReport,
   getCreatedContests,
   updateContestSettings,
-  stopContest
+  stopContest,
+  saveBattleDraft
 } from '../controllers/battleController.js';
 
 const router = express.Router();
@@ -35,6 +36,7 @@ router.post('/room/:roomId/reassign-team', authMiddleware, reassignParticipantTe
 // Contest Execution
 router.post('/start/:battleId', authMiddleware, startBattle);
 router.post('/:battleId/submit', authMiddleware, submitSolution);
+router.post('/:battleId/save-draft', authMiddleware, saveBattleDraft);
 router.post('/:battleId/abandon', authMiddleware, abandonBattle);
 router.get('/:battleId/summary', authMiddleware, getBattleSummary);
 router.get('/:battleId/hackathon-report', authMiddleware, getHackathonReport);

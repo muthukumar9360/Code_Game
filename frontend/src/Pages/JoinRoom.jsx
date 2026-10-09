@@ -59,13 +59,23 @@ const JoinRoom = () => {
       const data = await response.json();
 
       if (data.success) {
-        navigate(`/room/${data.battle.roomId}`, {
-          state: {
-            battle: data.battle,
-            isHost: false,
-            username: (username || "").trim()
-          }
-        });
+        if (data.battle?.status === "active") {
+          navigate(`/contest/${data.battle.roomId || data.battle.id}`, {
+            state: {
+              battle: data.battle,
+              isHost: Boolean(data.battle?.isHost),
+              username: (username || "").trim()
+            }
+          });
+        } else {
+          navigate(`/room/${data.battle.roomId}`, {
+            state: {
+              battle: data.battle,
+              isHost: Boolean(data.battle?.isHost),
+              username: (username || "").trim()
+            }
+          });
+        }
       } else {
         setError(data.error || "Uplink Failed: Invalid Room Code");
       }

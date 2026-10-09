@@ -39,6 +39,11 @@ const battleSchema = new Schema({
       type: String,
       default: 'python'
     },
+    drafts: {
+      type: Map,
+      of: String,
+      default: {}
+    },
     timeLeft: {
       type: Number, // seconds remaining for this participant
       default: null
