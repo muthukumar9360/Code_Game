@@ -89,7 +89,8 @@ const Home = () => {
           {[
             { label: "Practise", path: "/problems" },
             { label: "Daily Challenge", path: "/daily-blitz" },
-            { label: "Leaderboard", path: "/leaderboard" }
+            { label: "Leaderboard", path: "/leaderboard" },
+            { label: "Contest Manager", path: "/contest-management" }
           ].map((item) => (
             <button
               key={item.label}
@@ -133,6 +134,7 @@ const Home = () => {
                       <span className="text-[10px] text-gray-400 block font-mono">Logged in as</span>
                       <span className="font-bold text-orange-400 text-sm">{user}</span>
                     </div>
+                    <button onClick={() => navigate("/contest-management")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs font-mono text-orange-400">Contest Manager</button>
                     <button onClick={() => navigate("/profile")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">My Profile</button>
                     <button onClick={logout} className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 transition text-xs font-bold">Logout</button>
                   </>

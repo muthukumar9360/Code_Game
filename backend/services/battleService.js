@@ -74,27 +74,128 @@ export const endBattle = async (battleId) => {
       }
     }
 
-    // Decide winner/loser/draw by comparing bestScore across participants
-    const scores = battle.participants.map(p => p.bestScore || 0);
-    const maxScore = Math.max(...scores);
-    const winners = battle.participants.filter(p => (p.bestScore || 0) === maxScore);
+    // Decide winner/loser/draw by comparing team or individual scores
+    const isTeamMatch = Boolean(battle.battleType === '2vs2' || battle.battleType === '4vs4');
 
-    if (maxScore > 0) {
-      if (winners.length === 1) {
-        for (const p of battle.participants) {
-          if (p._id.toString() === winners[0]._id.toString()) p.result = 'win';
-          else p.result = 'lose';
+    if (isTeamMatch) {
+      const teamAParticipants = battle.participants.filter(p => p.team === 'A');
+      const teamBParticipants = battle.participants.filter(p => p.team === 'B');
+
+      const teamASolved = new Set();
+      let teamAScore = 0;
+      for (const p of teamAParticipants) {
+        teamAScore += (p.bestScore || 0);
+        for (const sp of (p.solvedProblems || [])) {
+          teamASolved.add((sp?._id || sp).toString());
         }
+      }
+
+      const teamBSolved = new Set();
+      let teamBScore = 0;
+      for (const p of teamBParticipants) {
+        teamBScore += (p.bestScore || 0);
+        for (const sp of (p.solvedProblems || [])) {
+          teamBSolved.add((sp?._id || sp).toString());
+        }
+      }
+
+      if (teamASolved.size > teamBSolved.size) {
+        for (const p of teamAParticipants) p.result = 'win';
+        for (const p of teamBParticipants) p.result = 'lose';
+      } else if (teamBSolved.size > teamASolved.size) {
+        for (const p of teamBParticipants) p.result = 'win';
+        for (const p of teamAParticipants) p.result = 'lose';
       } else {
-        for (const p of battle.participants) {
-          if ((p.bestScore || 0) === maxScore) p.result = 'draw';
-          else p.result = 'lose';
+        // Exactly same number of problems solved: compare the time taken to solve them!
+        if (teamASolved.size > 0) {
+          const startTimeMs = battle.startTime ? new Date(battle.startTime).getTime() : 0;
+          const userIdsA = teamAParticipants.map(p => (p.user?._id || p.user).toString());
+          const userIdsB = teamBParticipants.map(p => (p.user?._id || p.user).toString());
+
+          const correctSubs = await Submission.find({
+            battle: battle._id,
+            overallResult: { $in: ['accepted', 'passed'] }
+          }).sort({ submittedAt: 1, createdAt: 1 });
+
+          // Calculate total solve time for Team A
+          const teamASolveTimes = {};
+          for (const s of correctSubs) {
+            const uId = (s.user?._id || s.user).toString();
+            const pId = (s.problem?._id || s.problem).toString();
+            if (userIdsA.includes(uId) && !teamASolveTimes[pId]) {
+              const subTime = s.submittedAt ? new Date(s.submittedAt).getTime() : new Date(s.createdAt).getTime();
+              teamASolveTimes[pId] = Math.max(0, subTime - startTimeMs);
+            }
+          }
+          const totalTimeA = Object.values(teamASolveTimes).reduce((a, b) => a + b, 0);
+
+          // Calculate total solve time for Team B
+          const teamBSolveTimes = {};
+          for (const s of correctSubs) {
+            const uId = (s.user?._id || s.user).toString();
+            const pId = (s.problem?._id || s.problem).toString();
+            if (userIdsB.includes(uId) && !teamBSolveTimes[pId]) {
+              const subTime = s.submittedAt ? new Date(s.submittedAt).getTime() : new Date(s.createdAt).getTime();
+              teamBSolveTimes[pId] = Math.max(0, subTime - startTimeMs);
+            }
+          }
+          const totalTimeB = Object.values(teamBSolveTimes).reduce((a, b) => a + b, 0);
+
+          if (totalTimeA < totalTimeB) {
+            // Team A solved them in less time (faster)!
+            for (const p of teamAParticipants) p.result = 'win';
+            for (const p of teamBParticipants) p.result = 'lose';
+          } else if (totalTimeB < totalTimeA) {
+            // Team B solved them in less time (faster)!
+            for (const p of teamBParticipants) p.result = 'win';
+            for (const p of teamAParticipants) p.result = 'lose';
+          } else {
+            // Exactly tied on time as well: compare scores or draw
+            if (teamAScore > teamBScore) {
+              for (const p of teamAParticipants) p.result = 'win';
+              for (const p of teamBParticipants) p.result = 'lose';
+            } else if (teamBScore > teamAScore) {
+              for (const p of teamBParticipants) p.result = 'win';
+              for (const p of teamAParticipants) p.result = 'lose';
+            } else {
+              for (const p of battle.participants) p.result = 'draw';
+            }
+          }
+        } else {
+          // Neither team solved any problem: compare test cases passed (bestScore)
+          if (teamAScore > teamBScore) {
+            for (const p of teamAParticipants) p.result = 'win';
+            for (const p of teamBParticipants) p.result = 'lose';
+          } else if (teamBScore > teamAScore) {
+            for (const p of teamBParticipants) p.result = 'win';
+            for (const p of teamAParticipants) p.result = 'lose';
+          } else {
+            for (const p of battle.participants) p.result = 'draw';
+          }
         }
       }
     } else {
-      // No one scored
-      for (const p of battle.participants) {
-        p.result = 'draw';
+      const scores = battle.participants.map(p => p.bestScore || 0);
+      const maxScore = Math.max(...scores);
+      const winners = battle.participants.filter(p => (p.bestScore || 0) === maxScore);
+
+      if (maxScore > 0) {
+        if (winners.length === 1) {
+          for (const p of battle.participants) {
+            if (p._id.toString() === winners[0]._id.toString()) p.result = 'win';
+            else p.result = 'lose';
+          }
+        } else {
+          for (const p of battle.participants) {
+            if ((p.bestScore || 0) === maxScore) p.result = 'draw';
+            else p.result = 'lose';
+          }
+        }
+      } else {
+        // No one scored
+        for (const p of battle.participants) {
+          p.result = 'draw';
+        }
       }
     }
 

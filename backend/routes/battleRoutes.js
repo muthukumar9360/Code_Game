@@ -16,7 +16,10 @@ import {
   abandonBattle,
   getBattleSummary,
   getMyContestHistory,
-  getHackathonReport
+  getHackathonReport,
+  getCreatedContests,
+  updateContestSettings,
+  stopContest
 } from '../controllers/battleController.js';
 
 const router = express.Router();
@@ -35,6 +38,12 @@ router.post('/:battleId/submit', authMiddleware, submitSolution);
 router.post('/:battleId/abandon', authMiddleware, abandonBattle);
 router.get('/:battleId/summary', authMiddleware, getBattleSummary);
 router.get('/:battleId/hackathon-report', authMiddleware, getHackathonReport);
+
+// Contest Management & HackerRank-style Controls
+router.get('/created-contests', authMiddleware, getCreatedContests);
+router.put('/:battleId/settings', authMiddleware, updateContestSettings);
+router.post('/:battleId/settings', authMiddleware, updateContestSettings);
+router.post('/:battleId/stop', authMiddleware, stopContest);
 
 // Legacy / Direct endpoints
 router.post('/create', authMiddleware, createBattle);

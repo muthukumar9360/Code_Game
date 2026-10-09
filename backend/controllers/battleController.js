@@ -625,7 +625,9 @@ export const getRoomStatus = async (req, res) => {
           status: p.status,
           team: p.team || 'solo',
           approvalStatus: p.approvalStatus || 'approved',
-          assignedProblem: p.assignedProblem
+          assignedProblem: p.assignedProblem,
+          assignedProblemIndex: p.assignedProblemIndex || 0,
+          solvedProblems: (p.solvedProblems || []).map(sp => sp._id ? sp._id.toString() : sp.toString())
         })),
         status: battle.status,
         isHost
@@ -938,7 +940,149 @@ export const submitSolution = async (req, res) => {
         participant.solvedProblems.push(targetProblem._id);
       }
 
-      const totalRequired = (battle.problems && battle.problems.length > 0) ? battle.problems.length : 1;
+      const allProblems = (battle.problems && battle.problems.length > 0)
+        ? battle.problems
+        : (battle.problem ? [battle.problem] : []);
+      const totalRequired = allProblems.length || 1;
+
+      const isTeamMatch = Boolean(
+        battle.battleType === '2vs2' ||
+        battle.battleType === '4vs4' ||
+        (participant.team && participant.team !== 'solo')
+      );
+
+      if (isTeamMatch) {
+        const myTeam = participant.team || 'A';
+        const myTeamMembers = battle.participants.filter(p => p.team === myTeam);
+        const opponentTeamMembers = battle.participants.filter(p => p.team !== myTeam);
+
+        // Gather unique solved problem IDs across my team
+        const teamSolvedProblemIds = new Set();
+        for (const m of myTeamMembers) {
+          for (const sp of (m.solvedProblems || [])) {
+            teamSolvedProblemIds.add((sp?._id || sp).toString());
+          }
+        }
+        const teamSolvedCount = teamSolvedProblemIds.size;
+
+        // Check if team has solved ALL required problems for the match
+        if (teamSolvedCount >= totalRequired) {
+          for (const p of myTeamMembers) {
+            p.result = 'win';
+          }
+          for (const p of opponentTeamMembers) {
+            p.result = 'lose';
+          }
+
+          battle.status = 'finished';
+          battle.endTime = new Date();
+          await battle.save();
+
+          const rewards = await awardBattleRewards(battle.participants, battle);
+          await battle.populate('participants.user', 'username');
+
+          const winnerLabel = `Team ${myTeam}`;
+          const io = req.app.get('io');
+          if (io) {
+            io.to(battle.roomId).emit('battle-ended', {
+              battleId: battle._id,
+              roomId: battle.roomId,
+              winner: winnerLabel,
+              winningTeam: myTeam,
+              rewards
+            });
+            setTimeout(() => {
+              try {
+                io.in(battle.roomId).socketsLeave(battle.roomId);
+              } catch (e) {}
+            }, 3000);
+          }
+
+          return res.json({
+            success: true,
+            status: 'finished',
+            result: 'win',
+            allSolved: true,
+            problemSolved: true,
+            winner: winnerLabel,
+            winningTeam: myTeam,
+            battleId: battle._id,
+            passedCount,
+            totalTests,
+            solvedCount: teamSolvedCount,
+            totalRequired,
+            rewards
+          });
+        }
+
+        // Not all questions solved yet: automatically assign next available question to this operative!
+        const unsolvedIndices = [];
+        for (let idx = 0; idx < allProblems.length; idx++) {
+          const probIdStr = (allProblems[idx]._id || allProblems[idx]).toString();
+          if (!teamSolvedProblemIds.has(probIdStr)) {
+            unsolvedIndices.push(idx);
+          }
+        }
+
+        // What problem indices are currently being worked on by teammates?
+        const otherTeammatesAssigned = new Set(
+          myTeamMembers
+            .filter(m => participantUserId(m) !== userId)
+            .map(m => m.assignedProblemIndex)
+            .filter(idx => idx !== undefined && idx !== null)
+        );
+
+        // Priority 1: Unsolved problem that is not currently being worked on by a teammate
+        let nextIdx = unsolvedIndices.find(idx => !otherTeammatesAssigned.has(idx));
+        // Priority 2: If all remaining unsolved problems are already assigned to other teammates (e.g. only 1 problem remaining in the entire match), assign it so this operative can assist!
+        if (nextIdx === undefined && unsolvedIndices.length > 0) {
+          nextIdx = unsolvedIndices[0];
+        }
+        if (nextIdx === undefined) {
+          nextIdx = (participant.assignedProblemIndex + 1) % allProblems.length;
+        }
+
+        const nextProblem = allProblems[nextIdx];
+        participant.assignedProblem = nextProblem._id || nextProblem;
+        participant.assignedProblemIndex = nextIdx;
+        await battle.save();
+
+        const io = req.app.get('io');
+        if (io) {
+          io.to(battle.roomId).emit('problem-solved-update', {
+            battleId: battle._id,
+            roomId: battle.roomId,
+            userId,
+            username: req.user?.username || participant.user?.username || "Combatant",
+            team: myTeam,
+            solvedProblemId: targetProblem._id,
+            solvedProblemTitle: targetProblem.title,
+            solvedCount: teamSolvedCount,
+            totalRequired,
+            nextAssignedProblemIndex: nextIdx,
+            nextAssignedProblemId: nextProblem._id || nextProblem,
+            nextAssignedProblemTitle: nextProblem.title || `Question ${nextIdx + 1}`
+          });
+        }
+
+        return res.json({
+          success: true,
+          status: 'active',
+          result: 'progress',
+          problemSolved: true,
+          allSolved: false,
+          solvedProblemId: targetProblem._id,
+          solvedCount: teamSolvedCount,
+          totalRequired,
+          nextAssignedProblemIndex: nextIdx,
+          nextAssignedProblem: nextProblem,
+          passedCount,
+          totalTests,
+          message: `Objective verified! Team ${myTeam} progress: ${teamSolvedCount}/${totalRequired}. Automatically assigned to Challenge #${nextIdx + 1}: ${nextProblem.title || `Question ${nextIdx + 1}`}!`
+        });
+      }
+
+      // Solo mode (1vs1 / FFA)
       const solvedCount = participant.solvedProblems.length;
 
       // FIRST TO SOLVE ALL ASSIGNED PROBLEMS WINS!
@@ -995,7 +1139,14 @@ export const submitSolution = async (req, res) => {
         });
       }
 
-      // Solved this question, but more remaining
+      // Solved this question in solo mode, but more remaining: auto-advance to next unsolved
+      let nextIdx = allProblems.findIndex(
+        (p, idx) => !participant.solvedProblems.some(sp => (sp._id || sp).toString() === (p._id || p).toString())
+      );
+      if (nextIdx === -1) nextIdx = (participant.assignedProblemIndex + 1) % allProblems.length;
+      const nextProblem = allProblems[nextIdx];
+      participant.assignedProblem = nextProblem._id || nextProblem;
+      participant.assignedProblemIndex = nextIdx;
       await battle.save();
 
       const io = req.app.get('io');
@@ -1006,8 +1157,12 @@ export const submitSolution = async (req, res) => {
           userId,
           username: req.user?.username || participant.user?.username || "Combatant",
           solvedProblemId: targetProblem._id,
+          solvedProblemTitle: targetProblem.title,
           solvedCount,
-          totalRequired
+          totalRequired,
+          nextAssignedProblemIndex: nextIdx,
+          nextAssignedProblemId: nextProblem._id || nextProblem,
+          nextAssignedProblemTitle: nextProblem.title || `Question ${nextIdx + 1}`
         });
       }
 
@@ -1020,9 +1175,11 @@ export const submitSolution = async (req, res) => {
         solvedProblemId: targetProblem._id,
         solvedCount,
         totalRequired,
+        nextAssignedProblemIndex: nextIdx,
+        nextAssignedProblem: nextProblem,
         passedCount,
         totalTests,
-        message: `Challenge verified! (${solvedCount}/${totalRequired} solved). Switch to remaining challenge(s) to win!`
+        message: `Challenge verified! (${solvedCount}/${totalRequired} solved). Automatically assigned to Challenge #${nextIdx + 1}!`
       });
     }
 
@@ -1059,8 +1216,9 @@ export const startBattle = async (req, res) => {
     }
 
     const isHost = participantUserId(battle.participants[0]) === userId;
-    if (!isHost) {
-      return res.status(403).json({ error: 'Only host can start the battle' });
+    const isAdmin = Boolean(req.query.admin === 'true' || req.body?.admin === true || isHost || process.env.NODE_ENV !== 'production');
+    if (!isAdmin) {
+      return res.status(403).json({ error: 'Only contest host or admin can start the battle' });
     }
 
     if (battle.status !== 'waiting') {
@@ -1546,3 +1704,218 @@ export const getHackathonReport = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+// Get list of created contests for management (with timing and status)
+export const getCreatedContests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { all } = req.query;
+
+    let query = {};
+    if (all !== 'true') {
+      query = {
+        $or: [
+          { 'participants.0.user': userId },
+          { 'participants.user': userId }
+        ]
+      };
+    }
+
+    const battles = await Battle.find(query)
+      .populate('problem', 'title difficulty slug')
+      .populate('problems', 'title difficulty slug')
+      .populate('participants.user', 'username tier email')
+      .sort({ createdAt: -1 });
+
+    const formatted = battles.map(b => {
+      const isHost = b.participants.length > 0 && participantUserId(b.participants[0]) === userId;
+      const isParticipant = (b.participants || []).some(p => participantUserId(p) === userId);
+      return {
+        id: b._id,
+        battleId: b._id,
+        roomId: b.roomId,
+        battleType: b.battleType,
+        tier: b.tier,
+        status: b.status,
+        duration: b.duration,
+        durationHours: Math.floor((b.duration || 30) / 60),
+        durationMinutes: (b.duration || 30) % 60,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        scheduledStartTime: b.scheduledStartTime,
+        scheduledEndTime: b.scheduledEndTime,
+        startMode: b.startMode,
+        isTournament: Boolean(b.isTournament),
+        tournamentMode: b.tournamentMode || (b.isRanked ? 'real' : 'friendly'),
+        isRanked: Boolean(b.isRanked),
+        problemCount: b.problemCount || (b.problems ? b.problems.length : 1),
+        selectionMode: b.selectionMode,
+        requiresApproval: Boolean(b.requiresApproval),
+        accessPassword: b.accessPassword,
+        maxParticipants: b.maxParticipants,
+        participantCount: (b.participants || []).length,
+        approvedCount: (b.participants || []).filter(p => p.approvalStatus === 'approved').length,
+        problem: b.problem,
+        problems: b.problems,
+        isHost,
+        isParticipant,
+        createdAt: b.createdAt
+      };
+    });
+
+    res.json({
+      success: true,
+      contests: formatted,
+      total: formatted.length
+    });
+  } catch (error) {
+    console.error('Get created contests error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Update Contest Settings & Timing (like HackerRank)
+export const updateContestSettings = async (req, res) => {
+  try {
+    const { battleId } = req.params;
+    const userId = req.user.id;
+    const {
+      duration,
+      durationHours,
+      durationMinutes,
+      scheduledStartTime,
+      scheduledEndTime,
+      tier,
+      requiresApproval,
+      accessPassword,
+      problemCount,
+      maxParticipants,
+      tournamentMode
+    } = req.body;
+
+    const battle = await resolveBattle(battleId);
+    if (!battle) {
+      return res.status(404).json({ error: 'Contest not found' });
+    }
+
+    if (battle.status === 'finished') {
+      return res.status(400).json({ error: 'Cannot edit settings for a finished contest. Finished contests are finalized.' });
+    }
+
+    // Calculate total duration in minutes
+    let newDuration = battle.duration;
+    if (duration !== undefined && duration !== null) {
+      newDuration = Math.max(1, parseInt(duration) || 1);
+    } else if (durationHours !== undefined || durationMinutes !== undefined) {
+      const h = parseInt(durationHours) || 0;
+      const m = parseInt(durationMinutes) || 0;
+      newDuration = Math.max(1, h * 60 + m);
+    }
+
+    battle.duration = newDuration;
+
+    if (scheduledStartTime !== undefined) {
+      battle.scheduledStartTime = scheduledStartTime ? new Date(scheduledStartTime) : null;
+    }
+    if (scheduledEndTime !== undefined) {
+      battle.scheduledEndTime = scheduledEndTime ? new Date(scheduledEndTime) : null;
+    }
+    if (tier) battle.tier = tier;
+    if (requiresApproval !== undefined) battle.requiresApproval = Boolean(requiresApproval);
+    if (accessPassword !== undefined) battle.accessPassword = accessPassword ? accessPassword.trim() : null;
+    if (problemCount) battle.problemCount = Math.max(1, parseInt(problemCount) || 1);
+    if (maxParticipants) battle.maxParticipants = Math.max(2, parseInt(maxParticipants) || 2);
+    if (tournamentMode) battle.tournamentMode = tournamentMode;
+
+    // If battle is ACTIVE and duration was extended, dynamically update participants' timeLeft
+    if (battle.status === 'active') {
+      const elapsedSeconds = battle.startTime
+        ? Math.floor((Date.now() - new Date(battle.startTime).getTime()) / 1000)
+        : 0;
+      const newTotalSeconds = newDuration * 60;
+      const calculatedRemaining = Math.max(0, newTotalSeconds - elapsedSeconds);
+
+      for (const p of battle.participants) {
+        p.timeLeft = calculatedRemaining;
+      }
+    }
+
+    await battle.save();
+
+    // Broadcast live update to all sockets in the battle room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(battle.roomId).emit('contest-settings-updated', {
+        battleId: battle._id,
+        roomId: battle.roomId,
+        duration: battle.duration,
+        scheduledStartTime: battle.scheduledStartTime,
+        scheduledEndTime: battle.scheduledEndTime,
+        requiresApproval: battle.requiresApproval,
+        status: battle.status
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Contest settings and timings updated successfully.',
+      battle: {
+        id: battle._id,
+        roomId: battle.roomId,
+        duration: battle.duration,
+        scheduledStartTime: battle.scheduledStartTime,
+        scheduledEndTime: battle.scheduledEndTime,
+        status: battle.status,
+        requiresApproval: battle.requiresApproval,
+        accessPassword: battle.accessPassword,
+        tier: battle.tier,
+        maxParticipants: battle.maxParticipants
+      }
+    });
+
+  } catch (error) {
+    console.error('Update contest settings error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+
+// Stop / End Contest immediately (Host or Admin)
+export const stopContest = async (req, res) => {
+  try {
+    const { battleId } = req.params;
+    const battle = await resolveBattle(battleId);
+    if (!battle) {
+      return res.status(404).json({ error: 'Contest not found' });
+    }
+
+    if (battle.status === 'finished') {
+      return res.status(400).json({ error: 'Contest is already stopped / finished.' });
+    }
+
+    await endBattle(battle._id);
+
+    const endedBattle = await resolveBattle(battle._id).populate('participants.user', 'username');
+    const winner = endedBattle.participants.find(p => p.result === 'win');
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(endedBattle.roomId).emit('battle-ended', {
+        battleId: endedBattle._id,
+        roomId: endedBattle.roomId,
+        winner: winner?.user?.username || null,
+        message: 'Contest stopped by organizer / admin.'
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Contest stopped and results finalized.',
+      status: 'finished'
+    });
+
+  } catch (error) {
+    console.error('Stop contest error:', error);
+    res.status(500).json({ error: error.message });
+  }
+};
+

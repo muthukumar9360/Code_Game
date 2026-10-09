@@ -127,14 +127,11 @@ const ContestPage = () => {
   // Team Problem Claiming State ({ [problemIndex]: claimedByUsername })
   const [teamClaims, setTeamClaims] = useState({});
 
-  // Pre-Battle Problem Selection & Ready Countdown States
-  const [isSelectionPhase, setIsSelectionPhase] = useState(() => {
-    return Boolean(isTeamMatch && battle?.status !== "finished");
-  });
-  const [readyCountdown, setReadyCountdown] = useState(null); // null or 5..0
-  const [lockedProblems, setLockedProblems] = useState({}); // { [username]: { team, problemIndex, problemTitle } }
+  // Pre-Battle Problem Selection & Ready Countdown States (Auto-assigned mode)
+  const isSelectionPhase = false;
+  const readyCountdown = null;
+  const [lockedProblems, setLockedProblems] = useState({});
   const [isMyProblemLocked, setIsMyProblemLocked] = useState(false);
-  const readyCountdownTriggeredRef = useRef(false);
 
   // Team Consensus Exit State
   const [exitVoteInitiator, setExitVoteInitiator] = useState(null); // username of requester
@@ -155,6 +152,18 @@ const ContestPage = () => {
   const mySolvedCount = problemsList.filter(isProblemSolved).length;
   const totalRequired = problemsList.length || 1;
   const opponentSolvedCount = opponentParticipant?.solvedProblems?.length || 0;
+
+  // Squad solved count across all teammates
+  const myTeamMembers = (battle?.participants || []).filter(
+    (p) => (myTeam !== "solo" ? p.team === myTeam : true)
+  );
+  const teamSolvedSet = new Set();
+  for (const tp of myTeamMembers) {
+    for (const sp of (tp.solvedProblems || [])) {
+      teamSolvedSet.add((sp?._id || sp).toString());
+    }
+  }
+  const squadSolvedCount = isTeamMatch && myTeam !== "solo" ? teamSolvedSet.size : mySolvedCount;
 
   // Teammates in my team
   const teammateParticipants = (battle?.participants || []).filter(
@@ -261,41 +270,6 @@ const ContestPage = () => {
     }
   }, [battle, myParticipant, myTeam, problemsList.length]);
 
-  // Check if all combatants locked in during pre-battle phase to trigger 5s countdown
-  useEffect(() => {
-    if (!isTeamMatch || !isSelectionPhase || readyCountdown !== null) return;
-    const activeCombatants = battle?.participants || [];
-    if (!activeCombatants.length) return;
-
-    const allLocked = activeCombatants.every(p => {
-      const uName = (p.user?.username || p.username || p.user || "").trim();
-      return lockedProblems[uName] || (uName === myUsername && isMyProblemLocked);
-    });
-
-    if (allLocked && socketRef.current && !readyCountdownTriggeredRef.current) {
-      readyCountdownTriggeredRef.current = true;
-      socketRef.current.emit("start-ready-countdown", {
-        roomId: battle?.roomId || contestId
-      });
-    }
-  }, [lockedProblems, isMyProblemLocked, isTeamMatch, isSelectionPhase, readyCountdown, battle?.participants, contestId, myUsername]);
-
-  // Ready countdown ticker (5..4..3..2..1 -> Arena Opens)
-  useEffect(() => {
-    if (readyCountdown === null) return;
-    if (readyCountdown > 0) {
-      const timer = setTimeout(() => {
-        setReadyCountdown(prev => (prev > 0 ? prev - 1 : 0));
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (readyCountdown === 0) {
-      const timer = setTimeout(() => {
-        setIsSelectionPhase(false);
-        setReadyCountdown(null);
-      }, 1000);
-      return () => clearTimeout(timer);
-    }
-  }, [readyCountdown]);
 
   // Handle switching between questions
   const handleSwitchProblem = (newIndex) => {
@@ -593,8 +567,13 @@ const ContestPage = () => {
       if (!popupShownRef.current) {
         popupShownRef.current = true;
         const currentWinner = data.winner;
-        setIsWinner(currentWinner === myUsername);
-        setWinnerName(currentWinner || "A Combatant");
+        const isMyTeamWin = Boolean(
+          (data.winningTeam && myTeam !== "solo" && data.winningTeam === myTeam) ||
+          (currentWinner && myTeam !== "solo" && currentWinner.includes(myTeam))
+        );
+        const isMeWinner = currentWinner === myUsername || isMyTeamWin;
+        setIsWinner(isMeWinner);
+        setWinnerName(currentWinner || (isMyTeamWin ? `Team ${myTeam}` : "A Combatant"));
         setShowResultPopup(true);
       }
     });
@@ -613,7 +592,18 @@ const ContestPage = () => {
     });
 
     socketRef.current.on("problem-solved-update", (data) => {
-      setDebugOutput((prev) => prev + `> ⚔️ [ARENA TELEMETRY] ${data.username} solved a challenge! (${data.solvedCount}/${data.totalRequired})\n`);
+      setDebugOutput((prev) => prev + `> ⚔️ [ARENA TELEMETRY] ${data.username} solved ${data.solvedProblemTitle ? `"${data.solvedProblemTitle}"` : "a challenge"}! (${data.solvedCount}/${data.totalRequired})\n`);
+      const myId = localStorage.getItem("userId");
+      const isForMe = (data.userId && data.userId === myId) || data.username === myUsername;
+      if (isForMe && data.nextAssignedProblemIndex !== undefined) {
+        handleSwitchProblem(data.nextAssignedProblemIndex);
+        setDebugOutput((prev) => prev + `> 🚀 [AUTO-ASSIGN] Next objective assigned: Challenge #${data.nextAssignedProblemIndex + 1} (${data.nextAssignedProblemTitle || `Question ${data.nextAssignedProblemIndex + 1}`})!\n`);
+      }
+      fetchBattleStatus();
+    });
+
+    socketRef.current.on("contest-settings-updated", (data) => {
+      setDebugOutput((prev) => prev + `> ⚙️ [SYSTEM NOTICE] Contest settings updated live! Authorized duration: ${data.duration}m.\n`);
       fetchBattleStatus();
     });
 
@@ -810,17 +800,28 @@ const ContestPage = () => {
 
       if (res.data?.result === "win" && !popupShownRef.current) {
         popupShownRef.current = true;
-        setIsWinner(true);
-        setWinnerName(myUsername);
+        const isMyTeamWin = Boolean(
+          (res.data?.winningTeam && myTeam !== "solo" && res.data?.winningTeam === myTeam) ||
+          (res.data?.winner && myTeam !== "solo" && res.data?.winner.includes(myTeam))
+        );
+        setIsWinner(isMyTeamWin || res.data?.winner === myUsername);
+        setWinnerName(res.data?.winner || (isMyTeamWin ? `Team ${myTeam}` : myUsername));
         setShowResultPopup(true);
       } else if (res.data?.problemSolved && !res.data?.allSolved) {
         setDebugOutput(
           (prev) =>
             prev +
             `> 🎉 CHALLENGE SOLVED! Passed ${res.data.passedCount}/${res.data.totalTests} private testcases.\n` +
-            `> Overall Progress: ${res.data.solvedCount}/${res.data.totalRequired} challenges completed.\n` +
-            `> First to solve all challenges wins the arena! Select another question tab above to continue.\n`
+            `> Progress: ${res.data.solvedCount}/${res.data.totalRequired} challenges completed.\n`
         );
+        if (res.data?.nextAssignedProblemIndex !== undefined) {
+          handleSwitchProblem(res.data.nextAssignedProblemIndex);
+          setDebugOutput(
+            (prev) =>
+              prev +
+              `> 🚀 [AUTO-ASSIGN] Next objective automatically assigned: Challenge #${res.data.nextAssignedProblemIndex + 1} (${res.data.nextAssignedProblem?.title || `Question ${res.data.nextAssignedProblemIndex + 1}`})!\n`
+          );
+        }
       } else {
         setDebugOutput(
           (prev) =>
@@ -1092,193 +1093,7 @@ const ContestPage = () => {
         </div>
       )}
 
-      {/* 5-SECOND READY COUNTDOWN SCREEN */}
-      {readyCountdown !== null && (
-        <div className="fixed inset-0 z-50 bg-[#050b10]/95 backdrop-blur-xl flex flex-col items-center justify-center p-4 select-none">
-          <div className="text-center">
-            <span className="text-xs font-mono font-bold uppercase tracking-widest text-orange-400 animate-pulse block mb-4">
-              ⚔️ ALL COMBATANTS READY • BATTLE COMMENCING IN
-            </span>
-            <div className="text-8xl sm:text-9xl font-black text-transparent bg-clip-text bg-gradient-to-b from-white via-orange-400 to-red-500 animate-bounce">
-              {readyCountdown === 0 ? "GO!" : readyCountdown}
-            </div>
-            <div className="mt-8 p-4 rounded-2xl bg-white/5 border border-white/20 max-w-sm mx-auto">
-              <span className="text-xs text-gray-400 block font-mono mb-1">Your Designated Challenge:</span>
-              <span className="text-sm font-black text-white">
-                Challenge #{safeActiveIndex + 1}: {currentProblem?.title || `Question ${safeActiveIndex + 1}`}
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* PRE-BATTLE PROBLEM CLAIMING / SELECTION SCREEN */}
-      {isTeamMatch && myTeam !== "solo" && isSelectionPhase && readyCountdown === null && (
-        <div className="fixed inset-0 z-50 bg-[#050b10]/90 backdrop-blur-xl flex flex-col items-center justify-center p-4 sm:p-6 overflow-y-auto custom-scrollbar">
-          <div className="max-w-3xl w-full bg-[#0a1118] border-2 border-orange-500/50 rounded-2xl p-6 sm:p-8 shadow-2xl animate-in zoom-in-95">
-            {/* HEADER */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-6 border-b border-white/10">
-              <div>
-                <span className="text-xs font-mono uppercase tracking-widest text-orange-400 font-bold block mb-1">
-                  Team Coordination Directive
-                </span>
-                <h2 className="text-xl sm:text-2xl font-black text-white uppercase tracking-tight">
-                  Tactical Challenge Assignment
-                </h2>
-                <p className="text-xs text-gray-400 mt-1 font-mono">
-                  Each operative must claim their designated mission objective before combat begins.
-                </p>
-              </div>
-
-              {/* QUICK ODD / EVEN BUTTONS */}
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleSelectOdd}
-                  disabled={isMyProblemLocked}
-                  className="px-3 py-1.5 rounded-xl bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 border border-blue-400/30 text-xs font-mono font-bold transition cursor-pointer disabled:opacity-50"
-                  title="Claim Odd numbered challenge (Q1, Q3...)"
-                >
-                  Pick Odd (Q1, Q3)
-                </button>
-                <button
-                  onClick={handleSelectEven}
-                  disabled={isMyProblemLocked}
-                  className="px-3 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/40 text-purple-300 border border-purple-400/30 text-xs font-mono font-bold transition cursor-pointer disabled:opacity-50"
-                  title="Claim Even numbered challenge (Q2, Q4...)"
-                >
-                  Pick Even (Q2, Q4)
-                </button>
-              </div>
-            </div>
-
-            {/* PROBLEM SELECTION CARDS */}
-            <div className="py-6">
-              <span className="text-xs font-mono uppercase text-gray-400 font-bold block mb-3">
-                Available Combat Challenges:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {problemsList.map((prob, idx) => {
-                  const isSelectedByMe = idx === safeActiveIndex;
-                  const claimedBySquadMate = Object.values(lockedProblems).find(
-                    (l) => l.team === myTeam && l.problemIndex === idx && l.username !== myUsername
-                  )?.username || (teamClaims[idx] && teamClaims[idx] !== myUsername ? teamClaims[idx] : null);
-
-                  const diff = prob?.difficulty || "medium";
-                  const diffColor =
-                    diff === "easy"
-                      ? "text-green-400 border-green-500/40 bg-green-500/10"
-                      : diff === "medium"
-                      ? "text-yellow-400 border-yellow-500/40 bg-yellow-500/10"
-                      : "text-red-400 border-red-500/40 bg-red-500/10";
-
-                  return (
-                    <div
-                      key={prob?._id || idx}
-                      onClick={() => {
-                        if (!isMyProblemLocked && !claimedBySquadMate) {
-                          setActiveProblemIndex(idx);
-                        }
-                      }}
-                      className={`p-4 rounded-xl border-2 transition relative flex flex-col justify-between ${
-                        claimedBySquadMate
-                          ? "bg-white/5 border-white/10 opacity-50 cursor-not-allowed"
-                          : isSelectedByMe
-                          ? "bg-orange-500/15 border-orange-500 shadow-[0_0_20px_rgba(249,115,22,0.2)] cursor-pointer"
-                          : "bg-white/5 border-white/20 hover:border-white/50 cursor-pointer"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between gap-2 mb-2">
-                        <span className="text-xs font-mono font-bold text-gray-400">
-                          {idx % 2 === 0 ? "Odd Question" : "Even Question"} • Q{idx + 1}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded text-[9px] uppercase font-bold border ${diffColor}`}>
-                          {diff}
-                        </span>
-                      </div>
-
-                      <h4 className="text-sm font-bold text-white mb-3">
-                        {prob?.title || `Classified Question ${idx + 1}`}
-                      </h4>
-
-                      <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[11px] font-mono">
-                        {claimedBySquadMate ? (
-                          <span className="text-blue-300 font-bold flex items-center gap-1">
-                            <FaLock size={10} /> Claimed by {claimedBySquadMate}
-                          </span>
-                        ) : isSelectedByMe ? (
-                          <span className="text-orange-400 font-bold flex items-center gap-1">
-                            {isMyProblemLocked ? "✓ Locked By You" : "Selected (Click Lock In)"}
-                          </span>
-                        ) : (
-                          <span className="text-gray-500">Click to Select</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* SQUAD ROSTER LOCK-IN STATUS */}
-            <div className="p-4 rounded-xl bg-white/5 border border-white/10 mb-6">
-              <span className="text-[11px] font-mono uppercase text-gray-400 font-bold block mb-2">
-                Team {myTeam} Operatives Status:
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-mono">
-                {/* MY STATUS */}
-                <div className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10">
-                  <span className="font-bold text-white">👤 You ({myUsername}):</span>
-                  {isMyProblemLocked ? (
-                    <span className="text-emerald-400 font-bold flex items-center gap-1">
-                      <FaCheckCircle size={11} /> Locked Q{safeActiveIndex + 1}
-                    </span>
-                  ) : (
-                    <span className="text-amber-400 font-semibold flex items-center gap-1 animate-pulse">
-                      <FaHourglassHalf size={11} /> Selecting...
-                    </span>
-                  )}
-                </div>
-
-                {/* TEAMMATES STATUS */}
-                {teammateParticipants.map((tp, idx) => {
-                  const tName = tp.user?.username || tp.username || tp.user || "Teammate";
-                  const lockEntry = lockedProblems[tName];
-                  return (
-                    <div key={idx} className="flex items-center justify-between p-2 rounded-lg bg-black/40 border border-white/10">
-                      <span className="text-gray-300 font-bold">👥 {tName}:</span>
-                      {lockEntry ? (
-                        <span className="text-emerald-400 font-bold flex items-center gap-1">
-                          <FaCheckCircle size={11} /> Locked Q{lockEntry.problemIndex + 1}
-                        </span>
-                      ) : (
-                        <span className="text-amber-400 font-semibold flex items-center gap-1 animate-pulse">
-                          <FaHourglassHalf size={11} /> Choosing...
-                        </span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* CONFIRM / LOCK-IN BUTTON */}
-            <div className="flex flex-col sm:flex-row gap-3">
-              {!isMyProblemLocked ? (
-                <button
-                  onClick={() => handleLockInSelection(safeActiveIndex)}
-                  className="flex-1 py-3 rounded-xl bg-gradient-to-r from-orange-500 to-amber-600 hover:from-orange-400 hover:to-amber-500 text-black font-black text-sm uppercase tracking-wider transition shadow-lg shadow-orange-500/20 cursor-pointer flex items-center justify-center gap-2"
-                >
-                  <FaLock /> Lock In Challenge #{safeActiveIndex + 1}
-                </button>
-              ) : (
-                <div className="flex-1 py-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 font-black text-xs uppercase tracking-wider text-center flex items-center justify-center gap-2">
-                  <FaCheckCircle className="animate-spin text-sm" /> Challenge Locked In — Awaiting other operatives...
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* SQUAD MISSION COMMAND BAR: ONLY SELECTED PROBLEM SHOWN TO EACH PLAYER */}
       {isTeamMatch && myTeam !== "solo" ? (
@@ -1331,7 +1146,10 @@ const ContestPage = () => {
             {/* TEAM SOLVED TOTAL PILL */}
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-orange-500/10 border border-orange-500/30 text-xs font-mono text-orange-300">
               <span className="text-gray-400">Squad Goal:</span>
-              <span className="font-bold text-white">{mySolvedCount}/{totalRequired} Solved</span>
+              <span className="font-bold text-white">{squadSolvedCount}/{totalRequired} Solved</span>
+              {squadSolvedCount === totalRequired && (
+                <span className="text-emerald-400 font-bold ml-1">🏆 All Complete!</span>
+              )}
             </div>
           </div>
         </div>
@@ -1485,26 +1303,18 @@ const ContestPage = () => {
                   <FaUsers className="text-blue-400 text-sm shrink-0" />
                   <div>
                     <span className="text-gray-400">Team {myTeam} Assignment: </span>
-                    {teamClaims[safeActiveIndex] ? (
-                      <span className="font-bold text-white">
-                        {teamClaims[safeActiveIndex] === myUsername
-                          ? "👤 You are currently tackling this challenge"
-                          : `👤 ${teamClaims[safeActiveIndex]} is actively solving this challenge`}
-                      </span>
-                    ) : (
-                      <span className="text-amber-400 font-bold">Unclaimed (Available to pick)</span>
-                    )}
+                    <span className="font-bold text-white">
+                      Challenge #{safeActiveIndex + 1}: {currentProblem?.title || `Question ${safeActiveIndex + 1}`}
+                    </span>
+                    <span className="text-blue-300/80 text-[11px] block sm:inline sm:ml-2">
+                      (Auto-assigned • Solve to unlock next squad challenge)
+                    </span>
                   </div>
                 </div>
 
-                {teamClaims[safeActiveIndex] !== myUsername && (
-                  <button
-                    onClick={() => handleClaimProblem(safeActiveIndex)}
-                    className="px-2.5 py-1 bg-blue-500/20 hover:bg-blue-500/40 text-blue-300 hover:text-white rounded-lg text-[10px] uppercase font-bold tracking-wider border border-blue-400/40 transition shrink-0 cursor-pointer"
-                  >
-                    Claim Challenge
-                  </button>
-                )}
+                <div className="px-2.5 py-1 bg-blue-500/20 text-blue-300 rounded-lg text-[10px] uppercase font-bold tracking-wider border border-blue-400/40 shrink-0">
+                  {isProblemSolved(currentProblem) ? "✓ Solved" : "Active Objective"}
+                </div>
               </div>
             )}
 
@@ -1513,7 +1323,9 @@ const ContestPage = () => {
                 <FaCheckCircle className="text-green-400 text-sm shrink-0" />
                 <span>
                   {myTeam !== "solo"
-                    ? "🎉 You have completed your assigned challenge objective! Awaiting your teammates to finish their challenges to secure squad victory."
+                    ? squadSolvedCount >= totalRequired
+                      ? "🎉 Squad objective accomplished! All team challenges solved."
+                      : "🎉 Challenge verified! Loading next squad challenge objective..."
                     : "You have solved this challenge! Choose another question tab above to solve all and claim victory."}
                 </span>
               </div>

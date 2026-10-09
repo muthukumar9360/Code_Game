@@ -13,7 +13,8 @@ import {
   FaLayerGroup,
   FaFilter,
   FaGamepad,
-  FaHandshake
+  FaHandshake,
+  FaClock
 } from "react-icons/fa";
 import BackButton from "../Components/BackButton.jsx";
 import LeetCodeActivityModule from "../Components/LeetCodeActivityModule.jsx";
@@ -103,10 +104,12 @@ const Profile = () => {
   const battleWinsCount = history.filter((h) => h.result === "win").length;
   const winRate = history.length > 0 ? Math.round((battleWinsCount / history.length) * 100) : 0;
 
-  // Separate XP Breakdown
+  // Separate XP & Points Breakdown
   const practiceXp = user.practiceXp || 0;
   const rankedBattleXp = user.rankedBattleXp || 0;
   const contestXp = user.contestXp || 0;
+  const friendRoomPoints = user.friendRoomPoints || 0;
+  const tournamentPoints = user.tournamentPoints || 0;
   const totalXp = user.xp || (practiceXp + rankedBattleXp + contestXp);
 
   // Separate Match Types: Ranked 1v1, Official Contests, Friendly Exhibitions
@@ -114,7 +117,7 @@ const Profile = () => {
     (h) => Boolean(h.isRanked) || (h.roomId && h.roomId.startsWith("RNK"))
   );
   const officialTournaments = history.filter(
-    (h) => !rankedMatches.includes(h) && (h.isTournament || h.battleType === "contest" || h.tournamentMode === "real") && h.tournamentMode !== "friendly"
+    (h) => !rankedMatches.includes(h) && (h.isTournament || h.battleType === "contest" || (h.roomId && (h.roomId.startsWith("TOURN") || h.roomId.startsWith("CONTEST"))) || h.tournamentMode === "real") && h.tournamentMode !== "friendly"
   );
   const friendlyMatches = history.filter(
     (h) => !rankedMatches.includes(h) && !officialTournaments.includes(h)
@@ -127,6 +130,7 @@ const Profile = () => {
   const tourneyWinRate = officialTournaments.length > 0 ? Math.round((tourneyWins / officialTournaments.length) * 100) : 0;
 
   const friendlyWins = friendlyMatches.filter((h) => h.result === "win").length;
+  const friendlyWinRate = friendlyMatches.length > 0 ? Math.round((friendlyWins / friendlyMatches.length) * 100) : 0;
 
   const displayedMatches =
     contestFilter === "ranked"
@@ -183,19 +187,20 @@ const Profile = () => {
           </div>
         </div>
 
-        {/* DEDICATED SEPARATE XP TELEMETRY CARDS */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <StatCard title="Practice XP" value={`${practiceXp} XP`} highlight="emerald" subtitle="Practice & Daily Challenge Solved" />
-          <StatCard title="Ranked Battle XP" value={`${rankedBattleXp} XP`} highlight="orange" subtitle="1v1 Live Ranked Matchmaking" />
-          <StatCard title="Contest XP" value={`${contestXp} XP`} highlight="cyan" subtitle="Official Tournament Battles" />
-          <StatCard title="Total XP" value={`${totalXp} XP`} highlight="yellow" subtitle="Global Progression Currency" />
+        {/* DEDICATED SEPARATE XP & POINTS TELEMETRY CARDS */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 mb-8">
+          <StatCard title="Practice XP" value={`${practiceXp} XP`} highlight="emerald" subtitle="Solo & Daily Challenges" />
+          <StatCard title="Ranked Battle XP" value={`${rankedBattleXp} XP`} highlight="orange" subtitle={`Tier: ${user.tier || "Bronze"}`} />
+          <StatCard title="Friendly Points" value={`${friendRoomPoints} Pts`} highlight="purple" subtitle="Casual Duel Sparring" />
+          <StatCard title="Contest XP" value={`${contestXp} XP`} highlight="cyan" subtitle={`${tournamentPoints} Tourney Pts`} />
+          <StatCard title="Total XP" value={`${totalXp} XP`} highlight="yellow" subtitle="Global Progression Rank" />
         </div>
 
         {/* PROFILE NAVIGATION TABS WITH WHITE BORDER */}
         <div className="flex items-center gap-2 p-1.5 bg-black/60 rounded-2xl mb-8 overflow-x-auto custom-scrollbar">
           <button
             onClick={() => setActiveProfileTab("overview")}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeProfileTab === "overview"
                 ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black shadow-lg"
                 : "text-gray-400 hover:text-white hover:bg-white/5"
@@ -207,7 +212,7 @@ const Profile = () => {
 
           <button
             onClick={() => setActiveProfileTab("solved")}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeProfileTab === "solved"
                 ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black shadow-lg"
                 : "text-gray-400 hover:text-white hover:bg-white/5"
@@ -219,7 +224,7 @@ const Profile = () => {
 
           <button
             onClick={() => setActiveProfileTab("contests")}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap ${
+            className={`px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
               activeProfileTab === "contests"
                 ? "bg-gradient-to-r from-orange-500 to-amber-500 text-black font-black shadow-lg"
                 : "text-gray-400 hover:text-white hover:bg-white/5"
@@ -227,6 +232,15 @@ const Profile = () => {
           >
             <FaMedal />
             <span>Competitive Match Archives ({history.length})</span>
+          </button>
+
+          <button
+            onClick={() => navigate("/contest-management")}
+            className="px-5 py-2.5 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition-all flex items-center gap-2 whitespace-nowrap bg-purple-500/20 hover:bg-purple-500/30 text-purple-300 border border-purple-500/40 cursor-pointer"
+            title="Manage created contests, edit timings, start, and stop"
+          >
+            <FaClock />
+            <span>Manage Deployed Contests</span>
           </button>
         </div>
 
@@ -252,35 +266,122 @@ const Profile = () => {
           </div>
         )}
 
-        {/* TAB 3: SEPARATED MATCHES (RANKED VS CONTEST VS FRIENDLY) */}
+        {/* TAB 3: SEPARATED MATCHES (RANKED VS FRIENDLY VS CONTEST) */}
         {activeProfileTab === "contests" && (
           <div className="bg-[#0a1118] border-2 border-white/40 rounded-3xl p-6 shadow-2xl">
-            {/* CONTESTS HEADER WITH TELEMETRY */}
-            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 mb-6 border-b border-white/20 pb-5">
-              <div>
+            {/* CONTESTS HEADER */}
+            <div className="mb-6 border-b border-white/20 pb-5">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
                 <h2 className="text-xl font-black tracking-widest uppercase text-white flex items-center gap-2">
-                  <FaMedal className="text-orange-400" /> Competitive Match Records
+                  <FaMedal className="text-orange-400" /> Competitive Match & Contest Records
                 </h2>
-                <p className="text-xs text-gray-400 font-mono mt-0.5">
-                  Separated archives of Ranked 1v1 Matches, Official Tournament Contests, and Friendly Exhibitions.
-                </p>
+                <span className="text-[11px] font-mono text-gray-400 bg-white/5 px-3 py-1 rounded-full border border-white/10">
+                  Total Battles: {history.length}
+                </span>
+              </div>
+              <p className="text-xs text-gray-400 font-mono">
+                Cleanly separated telemetry for <strong className="text-orange-400">Ranked 1v1</strong>, <strong className="text-purple-400">Friendly Exhibitions</strong>, and <strong className="text-cyan-400">Contest & Tournament Arenas</strong>.
+              </p>
+            </div>
+
+            {/* THREE PROMINENT DEDICATED TELEMETRY CARDS */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              {/* 1. RANKED 1v1 DETAILS CARD */}
+              <div
+                onClick={() => setContestFilter("ranked")}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden ${
+                  contestFilter === "ranked"
+                    ? "bg-orange-500/15 border-orange-500 shadow-lg shadow-orange-500/20"
+                    : "bg-[#050b10] border-orange-500/30 hover:border-orange-500/60"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-mono uppercase font-black text-orange-400 flex items-center gap-1.5">
+                    <FaShieldAlt size={12} /> Ranked 1v1 Details
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-orange-500/20 border border-orange-500/40 text-orange-300">
+                    Tier: {user.tier || "Bronze"}
+                  </span>
+                </div>
+                <div className="space-y-1 font-mono">
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">Ranked Battle XP:</span>
+                    <strong className="text-orange-400 font-black text-sm">{rankedBattleXp} XP</strong>
+                  </div>
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">1v1 Record:</span>
+                    <strong className="text-white font-bold">{rankedWins}W / {rankedMatches.length} ({rankedWinRate}%)</strong>
+                  </div>
+                  <div className="flex justify-between items-baseline text-[11px] text-gray-500 pt-1 border-t border-white/10">
+                    <span>Stakes:</span>
+                    <span className="text-orange-300/80">+25 Win / -15 Loss</span>
+                  </div>
+                </div>
               </div>
 
-              {/* THREE SEPARATE TELEMETRY BADGES */}
-              <div className="flex flex-wrap items-center gap-2.5">
-                <div className="px-3 py-1.5 rounded-xl bg-orange-500/10 border border-white/30 text-xs font-mono">
-                  <span className="text-gray-400">Ranked 1v1: </span>
-                  <strong className="text-orange-400 font-bold">{rankedWins}W / {rankedMatches.length}</strong>
-                  <span className="text-gray-500 text-[10px] ml-1">({rankedWinRate}%)</span>
+              {/* 2. FRIENDLY DETAILS CARD */}
+              <div
+                onClick={() => setContestFilter("friendly")}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden ${
+                  contestFilter === "friendly"
+                    ? "bg-purple-500/15 border-purple-500 shadow-lg shadow-purple-500/20"
+                    : "bg-[#050b10] border-purple-500/30 hover:border-purple-500/60"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-mono uppercase font-black text-purple-400 flex items-center gap-1.5">
+                    <FaHandshake size={12} /> Friendly Match Details
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-purple-500/20 border border-purple-500/40 text-purple-300">
+                    0 XP Risk
+                  </span>
                 </div>
-                <div className="px-3 py-1.5 rounded-xl bg-cyan-500/10 border border-white/30 text-xs font-mono">
-                  <span className="text-gray-400">Official Contests: </span>
-                  <strong className="text-cyan-400 font-bold">{tourneyWins}W / {officialTournaments.length}</strong>
-                  <span className="text-gray-500 text-[10px] ml-1">({tourneyWinRate}%)</span>
+                <div className="space-y-1 font-mono">
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">Friend Room Points:</span>
+                    <strong className="text-purple-400 font-black text-sm">{friendRoomPoints} Pts</strong>
+                  </div>
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">Friendly Record:</span>
+                    <strong className="text-white font-bold">{friendlyWins}W / {friendlyMatches.length} ({friendlyWinRate}%)</strong>
+                  </div>
+                  <div className="flex justify-between items-baseline text-[11px] text-gray-500 pt-1 border-t border-white/10">
+                    <span>Stakes:</span>
+                    <span className="text-purple-300/80">Casual Safe Sparring</span>
+                  </div>
                 </div>
-                <div className="px-3 py-1.5 rounded-xl bg-purple-500/10 border border-white/30 text-xs font-mono">
-                  <span className="text-gray-400">Friendly: </span>
-                  <strong className="text-purple-400 font-bold">{friendlyWins}W / {friendlyMatches.length}</strong>
+              </div>
+
+              {/* 3. CONTEST & TOURNAMENT DETAILS CARD */}
+              <div
+                onClick={() => setContestFilter("contest")}
+                className={`p-4 rounded-2xl border-2 transition-all cursor-pointer relative overflow-hidden ${
+                  contestFilter === "contest"
+                    ? "bg-cyan-500/15 border-cyan-500 shadow-lg shadow-cyan-500/20"
+                    : "bg-[#050b10] border-cyan-500/30 hover:border-cyan-500/60"
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-mono uppercase font-black text-cyan-400 flex items-center gap-1.5">
+                    <FaTrophy size={12} /> Contest Arena Details
+                  </span>
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold bg-cyan-500/20 border border-cyan-500/40 text-cyan-300">
+                    Tournaments
+                  </span>
+                </div>
+                <div className="space-y-1 font-mono">
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">Contest XP / Pts:</span>
+                    <strong className="text-cyan-400 font-black text-sm">{contestXp} XP ({tournamentPoints} Pts)</strong>
+                  </div>
+                  <div className="flex justify-between items-baseline text-xs">
+                    <span className="text-gray-400">Contest Record:</span>
+                    <strong className="text-white font-bold">{tourneyWins}W / {officialTournaments.length} ({tourneyWinRate}%)</strong>
+                  </div>
+                  <div className="flex justify-between items-baseline text-[11px] text-gray-500 pt-1 border-t border-white/10">
+                    <span>Format:</span>
+                    <span className="text-cyan-300/80">Timed Multi-Problem</span>
+                  </div>
                 </div>
               </div>
             </div>
@@ -289,43 +390,43 @@ const Profile = () => {
             <div className="flex flex-wrap items-center gap-2 mb-6">
               <button
                 onClick={() => setContestFilter("all")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition cursor-pointer ${
                   contestFilter === "all"
                     ? "bg-white text-black font-black shadow-md"
                     : "bg-white/5 hover:bg-white/10 text-gray-300 hover:text-white border border-white/30"
                 }`}
               >
-                All Records ({history.length})
+                All Match Archives ({history.length})
               </button>
               <button
                 onClick={() => setContestFilter("ranked")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer ${
                   contestFilter === "ranked"
                     ? "bg-orange-500 text-black font-black shadow-md"
                     : "bg-white/5 hover:bg-white/10 text-orange-400 hover:text-orange-300 border border-white/30"
                 }`}
               >
-                <FaShieldAlt size={11} /> 1v1 Live Ranked ({rankedMatches.length})
-              </button>
-              <button
-                onClick={() => setContestFilter("contest")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${
-                  contestFilter === "contest"
-                    ? "bg-cyan-500 text-black font-black shadow-md"
-                    : "bg-white/5 hover:bg-white/10 text-cyan-400 hover:text-cyan-300 border border-white/30"
-                }`}
-              >
-                <FaTrophy size={11} /> Official Contests ({officialTournaments.length})
+                <FaShieldAlt size={11} /> ⚔️ Ranked Details ({rankedMatches.length})
               </button>
               <button
                 onClick={() => setContestFilter("friendly")}
-                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-1.5 ${
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer ${
                   contestFilter === "friendly"
                     ? "bg-purple-500 text-black font-black shadow-md"
                     : "bg-white/5 hover:bg-white/10 text-purple-400 hover:text-purple-300 border border-white/30"
                 }`}
               >
-                <FaHandshake size={11} /> Friendly Exhibitions ({friendlyMatches.length})
+                <FaHandshake size={11} /> 🤝 Friendly Details ({friendlyMatches.length})
+              </button>
+              <button
+                onClick={() => setContestFilter("contest")}
+                className={`px-4 py-2 rounded-xl text-xs font-bold font-mono uppercase tracking-wider transition flex items-center gap-1.5 cursor-pointer ${
+                  contestFilter === "contest"
+                    ? "bg-cyan-500 text-black font-black shadow-md"
+                    : "bg-white/5 hover:bg-white/10 text-cyan-400 hover:text-cyan-300 border border-white/30"
+                }`}
+              >
+                <FaTrophy size={11} /> 🏆 Contest Details ({officialTournaments.length})
               </button>
             </div>
 
@@ -335,64 +436,83 @@ const Profile = () => {
                 {contestFilter === "ranked"
                   ? "No 1v1 Live Ranked matches recorded yet. Jump into the ranked queue to earn Ranked Battle XP!"
                   : contestFilter === "contest"
-                  ? "No official tournament contests recorded yet."
+                  ? "No tournament contests recorded yet. Deploy or participate in contest rooms to build your record!"
                   : contestFilter === "friendly"
-                  ? "No friendly exhibitions recorded yet."
+                  ? "No friendly exhibitions recorded yet. Play casual matches with friends with 0 XP loss risk!"
                   : "No competitive battle matches recorded yet."}
               </div>
             ) : (
-              <div className="space-y-4">
+              <div className="space-y-3.5">
                 {displayedMatches.map((battle, i) => {
                   const isRanked = Boolean(battle.isRanked) || (battle.roomId && battle.roomId.startsWith("RNK"));
-                  const isOfficial = !isRanked && (battle.isTournament || battle.battleType === "contest" || battle.tournamentMode === "real") && battle.tournamentMode !== "friendly";
+                  const isOfficial = !isRanked && (battle.isTournament || battle.battleType === "contest" || (battle.roomId && (battle.roomId.startsWith("TOURN") || battle.roomId.startsWith("CONTEST"))) || battle.tournamentMode === "real") && battle.tournamentMode !== "friendly";
                   const isFriendly = !isRanked && !isOfficial;
 
                   return (
                     <div
-                      key={i}
-                      className="flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-black/40 border border-white/30 p-5 rounded-2xl hover:border-white transition"
+                      key={battle.battleId || i}
+                      className={`flex flex-col sm:flex-row justify-between sm:items-center gap-4 bg-black/40 border-2 p-5 rounded-2xl transition hover:shadow-xl ${
+                        isRanked
+                          ? "border-orange-500/30 hover:border-orange-500/70"
+                          : isFriendly
+                          ? "border-purple-500/30 hover:border-purple-500/70"
+                          : "border-cyan-500/30 hover:border-cyan-500/70"
+                      }`}
                     >
                       <div>
                         <div className="flex flex-wrap items-center gap-2.5">
                           <span className="font-bold text-white text-base">
                             {battle.problemTitle || "Battle Arena"}
                           </span>
+
+                          {/* CATEGORY BADGE */}
                           <span
-                            className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase border border-white/30 ${
+                            className={`px-2.5 py-0.5 rounded text-[10px] font-mono font-bold uppercase border ${
                               isRanked
-                                ? "bg-orange-500/10 text-orange-400"
-                                : isOfficial
-                                ? "bg-cyan-500/10 text-cyan-400"
-                                : "bg-purple-500/10 text-purple-400"
+                                ? "bg-orange-500/15 text-orange-400 border-orange-500/40"
+                                : isFriendly
+                                ? "bg-purple-500/15 text-purple-300 border-purple-500/40"
+                                : "bg-cyan-500/15 text-cyan-300 border-cyan-500/40"
                             }`}
                           >
-                            {isRanked ? "Ranked 1v1 (+25/-15 XP)" : isOfficial ? "Official Contest (+25/-15 XP)" : "Friendly Exhibition (0 XP)"}
+                            {isRanked ? "⚔️ Ranked 1v1 (+25/-15 XP)" : isFriendly ? "🤝 Friendly Duel (0 XP Risk)" : "🏆 Contest Arena (+25/-15 XP)"}
                           </span>
-                          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-gray-300 bg-white/5 border border-white/30 uppercase">
+
+                          <span className="px-2 py-0.5 rounded text-[10px] font-mono text-gray-300 bg-white/5 border border-white/20 uppercase">
                             {battle.battleType}
                           </span>
+
+                          {battle.roomId && (
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono text-gray-400 bg-white/5 border border-white/10">
+                              Room: {battle.roomId}
+                            </span>
+                          )}
                         </div>
-                        <p className="text-xs text-gray-400 font-mono mt-1">
-                          Opponents: {battle.opponents?.join(", ") || "Solo Duel"}
-                        </p>
-                        <p className="text-xs text-gray-500 font-mono mt-0.5">
+
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-400 font-mono mt-1.5">
+                          <span>Opponents: {battle.opponents?.join(", ") || "Solo Duel"}</span>
+                          {battle.duration && (
+                            <span className="text-gray-500">Duration: {battle.duration}m</span>
+                          )}
+                        </div>
+                        <p className="text-[11px] text-gray-500 font-mono mt-0.5">
                           {new Date(battle.createdAt).toLocaleString()}
                         </p>
                       </div>
 
-                      <div className="text-left sm:text-right flex sm:flex-col justify-between items-center sm:items-end">
+                      <div className="text-left sm:text-right flex sm:flex-col justify-between items-center sm:items-end shrink-0">
                         <span
-                          className={`font-black uppercase text-xs tracking-wider px-3 py-1 rounded-full border border-white/40 ${
+                          className={`font-black uppercase text-xs tracking-wider px-3.5 py-1 rounded-full border ${
                             battle.result === "win"
-                              ? "bg-green-500/20 text-green-400"
+                              ? "bg-green-500/20 text-green-400 border-green-500/40"
                               : battle.result === "lose"
-                              ? "bg-red-500/20 text-red-400"
-                              : "bg-yellow-500/20 text-yellow-400"
+                              ? "bg-red-500/20 text-red-400 border-red-500/40"
+                              : "bg-yellow-500/20 text-yellow-400 border-yellow-500/40"
                           }`}
                         >
-                          {battle.result}
+                          {battle.result === "win" ? "🏆 Victory" : battle.result === "lose" ? "Defeat" : battle.result}
                         </span>
-                        <p className="text-xs text-gray-400 font-mono mt-1.5">
+                        <p className="text-xs text-gray-300 font-mono mt-1.5 font-bold">
                           Score: {battle.bestScore || 0}
                         </p>
                       </div>
@@ -418,6 +538,8 @@ const StatCard = ({ title, value, highlight, subtitle }) => {
       ? "text-orange-400"
       : highlight === "yellow"
       ? "text-yellow-400"
+      : highlight === "purple"
+      ? "text-purple-400"
       : "text-white";
 
   return (

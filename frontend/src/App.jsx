@@ -14,6 +14,7 @@ import Problems from "./Pages/Problems.jsx";
 import ProblemSolve from "./Pages/ProblemSolve.jsx";
 import Leaderboard from "./Pages/Leaderboard.jsx";
 import DailyBlitz from "./Pages/DailyBlitz.jsx";
+import ContestManager from "./Pages/ContestManager.jsx";
 
 import AdminLogin from "./Admin/AdminLogin.jsx";
 import CreateProgram from "./Admin/createprogram.jsx";
@@ -41,6 +42,8 @@ function App() {
         <Route path="/problem/:slug" element={<ProblemSolve />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/daily-blitz" element={<DailyBlitz />} />
+        <Route path="/contest-management" element={<ContestManager />} />
+        <Route path="/created-contests" element={<ContestManager />} />
 
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />

@@ -214,8 +214,18 @@ const CreateRoom = () => {
       <div className="fixed bottom-[-10%] left-[-10%] w-[550px] h-[550px] bg-blue-600/10 blur-[140px] rounded-full pointer-events-none"></div>
 
       {/* TOP BAR WITH BACK BUTTON (FULL WIDTH MAX-W-[99%]) */}
-      <div className="w-full max-w-[99%] mx-auto flex items-center justify-between mb-6 z-20">
-        <BackButton to="/" label="Dashboard" />
+      <div className="w-full max-w-[99%] mx-auto flex flex-wrap items-center justify-between gap-3 mb-6 z-20">
+        <div className="flex items-center gap-3">
+          <BackButton to="/" label="Dashboard" />
+          <button
+            onClick={() => navigate("/contest-management")}
+            className="flex items-center gap-2 px-3 py-1.5 bg-orange-500/15 hover:bg-orange-500/25 border border-orange-500/40 hover:border-orange-500 text-orange-400 rounded-xl text-xs font-mono font-bold transition shadow-lg cursor-pointer"
+            title="View created contests to edit timing, start, or stop"
+          >
+            <FaClock size={12} />
+            <span>Manage Created Contests</span>
+          </button>
+        </div>
         <span className="text-[11px] uppercase tracking-widest text-gray-400 font-mono flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
           ARENA PROTOCOL // BTX-DEPLOY
@@ -525,26 +535,36 @@ const CreateRoom = () => {
 
                 {/* Row 2: Match Duration with Presets (Matches Row 2 in 03A) */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center justify-between mb-1.5 flex-wrap gap-1">
                     <label className="text-[10px] uppercase tracking-widest text-gray-400 font-bold flex items-center gap-1.5">
                       <FaClock /> Match Duration
                     </label>
-                    <div className="flex items-center gap-1">
-                      {[15, 30, 45, 60].map((mins) => (
+                    <div className="flex items-center gap-1 flex-wrap">
+                      {[
+                        { label: "15m", mins: 15 },
+                        { label: "30m", mins: 30 },
+                        { label: "1h", mins: 60 },
+                        { label: "2h", mins: 120 },
+                        { label: "4h", mins: 240 },
+                        { label: "12h", mins: 720 },
+                        { label: "24h", mins: 1440 },
+                        { label: "48h", mins: 2880 },
+                        { label: "7 Days", mins: 10080 }
+                      ].map((item) => (
                         <button
-                          key={mins}
+                          key={item.label}
                           type="button"
                           onClick={() => {
-                            setDurationHours(Math.floor(mins / 60));
-                            setDurationMinutes(mins % 60);
+                            setDurationHours(Math.floor(item.mins / 60));
+                            setDurationMinutes(item.mins % 60);
                           }}
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition ${
-                            (parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0) === mins
-                              ? "bg-orange-500 text-black border-orange-500 font-black"
+                          className={`px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition ${
+                            (parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0) === item.mins
+                              ? "bg-orange-500 text-black border-orange-500 font-black shadow-[0_0_8px_rgba(249,115,22,0.4)]"
                               : "bg-white/5 border border-white/30 text-gray-300 hover:border-white hover:text-white"
                           }`}
                         >
-                          {mins}m
+                          {item.label}
                         </button>
                       ))}
                     </div>
@@ -554,7 +574,7 @@ const CreateRoom = () => {
                       <input
                         type="number"
                         min="0"
-                        max="24"
+                        max="168"
                         value={durationHours}
                         onChange={(e) => setDurationHours(e.target.value === "" ? "" : Math.max(0, parseInt(e.target.value) || 0))}
                         placeholder="0"
@@ -575,6 +595,11 @@ const CreateRoom = () => {
                       <span className="absolute right-3 text-xs text-gray-400 font-mono pointer-events-none">min</span>
                     </div>
                   </div>
+                  {totalCalculatedDuration >= 1440 && (
+                    <span className="text-[10px] text-amber-400 font-mono mt-1.5 block">
+                      🔥 Long-Lasting Hackathon Mode: Match will stay active for {Math.floor(totalCalculatedDuration / 1440)} day(s) {Math.floor((totalCalculatedDuration % 1440) / 60)} hr(s).
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -583,7 +608,11 @@ const CreateRoom = () => {
                 <div className="flex justify-between items-center">
                   <span>Authorized Match Timer:</span>
                   <strong className="text-white font-bold">
-                    {totalCalculatedDuration} Minutes
+                    {totalCalculatedDuration >= 1440
+                      ? `${Math.floor(totalCalculatedDuration / 1440)}d ${Math.floor((totalCalculatedDuration % 1440) / 60)}h (${totalCalculatedDuration}m)`
+                      : totalCalculatedDuration >= 60
+                      ? `${Math.floor(totalCalculatedDuration / 60)}h ${totalCalculatedDuration % 60}m (${totalCalculatedDuration}m)`
+                      : `${totalCalculatedDuration} Minutes`}
                   </strong>
                 </div>
                 <div className="flex justify-between items-center">
