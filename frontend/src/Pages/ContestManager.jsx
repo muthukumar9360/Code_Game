@@ -42,6 +42,7 @@ const ContestManager = () => {
   const [editingContest, setEditingContest] = useState(null);
   const [editDurationHours, setEditDurationHours] = useState(0);
   const [editDurationMinutes, setEditDurationMinutes] = useState(30);
+  const [editIsUntimed, setEditIsUntimed] = useState(false);
   const [editScheduledStart, setEditScheduledStart] = useState("");
   const [editScheduledEnd, setEditScheduledEnd] = useState("");
   const [editRequiresApproval, setEditRequiresApproval] = useState(true);
@@ -151,6 +152,8 @@ const ContestManager = () => {
       return;
     }
     setEditingContest(c);
+    const untimed = Boolean(c.isUntimed || c.duration === 0);
+    setEditIsUntimed(untimed);
     const dur = c.duration || 30;
     setEditDurationHours(Math.floor(dur / 60));
     setEditDurationMinutes(dur % 60);
@@ -181,10 +184,11 @@ const ContestManager = () => {
     try {
       setSavingSettings(true);
       const token = localStorage.getItem("token");
-      const totalMinutes = Math.max(1, (parseInt(editDurationHours) || 0) * 60 + (parseInt(editDurationMinutes) || 0));
+      const totalMinutes = editIsUntimed ? 0 : Math.max(1, (parseInt(editDurationHours) || 0) * 60 + (parseInt(editDurationMinutes) || 0));
 
       const payload = {
         duration: totalMinutes,
+        isUntimed: editIsUntimed,
         scheduledStartTime: editScheduledStart ? new Date(editScheduledStart).toISOString() : null,
         scheduledEndTime: editScheduledEnd ? new Date(editScheduledEnd).toISOString() : null,
         requiresApproval: editRequiresApproval,
@@ -448,13 +452,15 @@ const ContestManager = () => {
               const isActive = c.status === "active";
               const isFinished = c.status === "finished";
 
-              const durationMins = c.duration || 30;
-              const durationFormatted =
-                durationMins >= 1440
-                  ? `${Math.floor(durationMins / 1440)}d ${Math.floor((durationMins % 1440) / 60)}h`
-                  : durationMins >= 60
-                  ? `${Math.floor(durationMins / 60)}h ${durationMins % 60}m`
-                  : `${durationMins}m`;
+              const isUntimed = Boolean(c.isUntimed || c.duration === 0);
+              const durationMins = isUntimed ? 0 : (c.duration || 30);
+              const durationFormatted = isUntimed
+                ? "♾️ Untimed"
+                : durationMins >= 1440
+                ? `${Math.floor(durationMins / 1440)}d ${Math.floor((durationMins % 1440) / 60)}h`
+                : durationMins >= 60
+                ? `${Math.floor(durationMins / 60)}h ${durationMins % 60}m`
+                : `${durationMins}m`;
 
               return (
                 <div
@@ -526,7 +532,7 @@ const ContestManager = () => {
                         <span className="text-[10px] text-gray-400 block">Duration Cadence</span>
                         <span className="font-bold text-white text-sm flex items-center gap-1.5 mt-0.5">
                           <FaClock className="text-orange-400 text-xs" />
-                          {durationFormatted} ({durationMins}m)
+                          {isUntimed ? "♾️ Untimed (Ends on Victory)" : `${durationFormatted} (${durationMins}m)`}
                         </span>
                         {durationMins >= 1440 && (
                           <span className="text-[9px] text-amber-400 block mt-0.5 font-bold">Multi-day Hackathon</span>
@@ -700,6 +706,28 @@ const ContestManager = () => {
                 <label className="text-xs font-mono uppercase text-gray-300 font-bold block mb-1.5 flex items-center gap-1.5">
                   <FaClock className="text-orange-400" /> Contest Duration
                 </label>
+                {/* UNTIMED TOGGLE IN EDIT MODAL */}
+                <div className="mb-2 p-2.5 bg-black/50 border border-white/20 rounded-xl flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm">♾️</span>
+                    <div>
+                      <div className="text-[11px] font-bold text-white uppercase tracking-wider">No Time Limit (Untimed Mode)</div>
+                      <div className="text-[9px] text-gray-400 font-mono">Contest ends only when winner solves all challenges</div>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditIsUntimed(!editIsUntimed)}
+                    className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold transition border cursor-pointer ${
+                      editIsUntimed
+                        ? "bg-purple-500 text-black border-purple-400 font-black shadow-[0_0_10px_rgba(168,85,247,0.4)]"
+                        : "bg-white/10 text-gray-300 border-white/20 hover:border-white"
+                    }`}
+                  >
+                    {editIsUntimed ? "ACTIVE ♾️" : "ENABLE"}
+                  </button>
+                </div>
+
                 <div className="grid grid-cols-2 gap-2 mb-2">
                   <div className="relative flex items-center">
                     <input

@@ -103,6 +103,10 @@ const battleSchema = new Schema({
     type: Number, // in minutes
     default: 30
   },
+  isUntimed: {
+    type: Boolean,
+    default: false
+  },
   tier: {
     type: String,
     enum: ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond'],

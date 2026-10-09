@@ -158,9 +158,13 @@ export const getBattleStatus = async (req, res) => {
       battle.startTime = startAnchor;
       battle.save().catch(() => {});
     }
-    const elapsed = startAnchor ? Math.max(0, Math.floor((now.getTime() - new Date(startAnchor).getTime()) / 1000)) : 0;
-    const totalDurationSec = (battle.duration || 30) * 60;
-    const computedRemaining = Math.max(0, totalDurationSec - elapsed);
+    const isUntimed = Boolean(battle.isUntimed || battle.duration === 0);
+    let computedRemaining = null;
+    if (!isUntimed) {
+      const elapsed = startAnchor ? Math.max(0, Math.floor((now.getTime() - new Date(startAnchor).getTime()) / 1000)) : 0;
+      const totalDurationSec = (battle.duration || 30) * 60;
+      computedRemaining = Math.max(0, totalDurationSec - elapsed);
+    }
 
     const formatProblem = (p) => {
       if (!p) return null;
@@ -187,7 +191,7 @@ export const getBattleStatus = async (req, res) => {
     }
 
     const mappedParticipants = battle.participants.map(p => {
-      const timeLeft = computedRemaining;
+      const timeLeft = isUntimed ? null : computedRemaining;
       return {
         userId: participantUserId(p),
         user: (p.user && p.user.username) ? p.user.username : participantUserId(p),
@@ -217,7 +221,8 @@ export const getBattleStatus = async (req, res) => {
         participants: mappedParticipants,
         startTime: battle.startTime || startAnchor,
         endTime: battle.endTime,
-        duration: battle.duration
+        duration: isUntimed ? 0 : battle.duration,
+        isUntimed
       }
     });
 
@@ -268,6 +273,7 @@ export const createRoom = async (req, res) => {
       tier,
       problemCount = 1,
       duration = 30,
+      isUntimed = false,
       selectionMode = 'random',
       selectedProblemSlugs = [],
       startMode = 'immediate',
@@ -353,7 +359,8 @@ export const createRoom = async (req, res) => {
       selectionMode,
       tier: tier || user.tier,
       battleType,
-      duration: parseInt(duration) || 30,
+      duration: (isUntimed || parseInt(duration) === 0) ? 0 : (parseInt(duration) || 30),
+      isUntimed: Boolean(isUntimed || parseInt(duration) === 0),
       maxParticipants: maxLimit,
       startMode,
       scheduledStartTime: scheduledStartTime ? new Date(scheduledStartTime) : null,
@@ -1323,20 +1330,24 @@ export const startBattle = async (req, res) => {
       io.to(populated.roomId).emit('battle-started', { battle: battleData });
     }
 
-    const durationMs = (populated.duration || 30) * 60 * 1000;
-    setTimeout(async () => {
-      try {
-        const currentBattle = await resolveBattle(battleId);
-        if (currentBattle && currentBattle.status === 'active') {
-          await endBattle(currentBattle._id);
-          if (io) {
-            io.to(currentBattle.roomId).emit('battle-ended', { message: 'Battle ended due to timeout' });
+    if (!populated.isUntimed && (populated.duration || 0) > 0) {
+      const durationMs = (populated.duration || 30) * 60 * 1000;
+      setTimeout(async () => {
+        try {
+          const currentBattle = await resolveBattle(battleId);
+          if (currentBattle && currentBattle.status === 'active') {
+            await endBattle(currentBattle._id);
+            if (io) {
+              const timeoutPayload = { message: 'Battle ended due to timeout' };
+              io.to(currentBattle.roomId).emit('battle-ended', timeoutPayload);
+              io.to(currentBattle._id.toString()).emit('battle-ended', timeoutPayload);
+            }
           }
+        } catch (error) {
+          console.error('Error ending battle on timeout:', error);
         }
-      } catch (error) {
-        console.error('Error ending battle on timeout:', error);
-      }
-    }, durationMs);
+      }, durationMs);
+    }
 
     res.json({
       success: true,
@@ -1758,6 +1769,7 @@ export const getCreatedContests = async (req, res) => {
         duration: b.duration,
         durationHours: Math.floor((b.duration || 30) / 60),
         durationMinutes: (b.duration || 30) % 60,
+        isUntimed: Boolean(b.isUntimed || b.duration === 0),
         startTime: b.startTime,
         endTime: b.endTime,
         scheduledStartTime: b.scheduledStartTime,
@@ -1822,15 +1834,24 @@ export const updateContestSettings = async (req, res) => {
 
     // Calculate total duration in minutes
     let newDuration = battle.duration;
-    if (duration !== undefined && duration !== null) {
-      newDuration = Math.max(1, parseInt(duration) || 1);
-    } else if (durationHours !== undefined || durationMinutes !== undefined) {
-      const h = parseInt(durationHours) || 0;
-      const m = parseInt(durationMinutes) || 0;
-      newDuration = Math.max(1, h * 60 + m);
+    const untimedRequested = req.body.isUntimed !== undefined ? Boolean(req.body.isUntimed) : (duration === 0);
+    if (untimedRequested) {
+      battle.isUntimed = true;
+      battle.duration = 0;
+      for (const p of battle.participants) {
+        p.timeLeft = null;
+      }
+    } else {
+      battle.isUntimed = false;
+      if (duration !== undefined && duration !== null) {
+        newDuration = Math.max(1, parseInt(duration) || 1);
+      } else if (durationHours !== undefined || durationMinutes !== undefined) {
+        const h = parseInt(durationHours) || 0;
+        const m = parseInt(durationMinutes) || 0;
+        newDuration = Math.max(1, h * 60 + m);
+      }
+      battle.duration = newDuration;
     }
-
-    battle.duration = newDuration;
 
     if (scheduledStartTime !== undefined) {
       battle.scheduledStartTime = scheduledStartTime ? new Date(scheduledStartTime) : null;

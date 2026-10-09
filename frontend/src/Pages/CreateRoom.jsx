@@ -29,6 +29,7 @@ const CreateRoom = () => {
   const [problemCount, setProblemCount] = useState(1);
   const [durationHours, setDurationHours] = useState(0);
   const [durationMinutes, setDurationMinutes] = useState(30);
+  const [isUntimed, setIsUntimed] = useState(false); // No Time Limit (Ends only when winner solves all problems)
   const [requiresApproval, setRequiresApproval] = useState(true);
   const [accessPassword, setAccessPassword] = useState("");
   const [securityMode, setSecurityMode] = useState("open"); // 'open' | 'password'
@@ -135,13 +136,14 @@ const CreateRoom = () => {
         ? new Date(Date.now() + scheduledMinutes * 60 * 1000)
         : null;
 
-      const totalDuration = Math.max(1, (parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0));
+      const totalDuration = isUntimed ? 0 : Math.max(1, (parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0));
 
       const payload = {
         battleType,
         tier,
         problemCount: Math.max(minRequired, parseInt(problemCount) || minRequired),
         duration: totalDuration,
+        isUntimed,
         selectionMode,
         selectedProblemSlugs: selectionMode === "manual" ? selectedSlugs : [],
         startMode,
@@ -496,7 +498,7 @@ const CreateRoom = () => {
                     <span>Sector 03B: Duration & Start Directives</span>
                   </div>
                   <span className="px-2.5 py-0.5 bg-orange-500/10 text-orange-400 border border-white/30 rounded text-[10px] font-mono font-bold uppercase">
-                    Total: {totalCalculatedDuration} Min
+                    {isUntimed ? "♾️ Untimed (Ends on Victory)" : `Total: ${totalCalculatedDuration} Min`}
                   </span>
                 </div>
 
@@ -540,6 +542,21 @@ const CreateRoom = () => {
                       <FaClock /> Match Duration
                     </label>
                     <div className="flex items-center gap-1 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsUntimed(true);
+                          setDurationHours(0);
+                          setDurationMinutes(0);
+                        }}
+                        className={`px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition cursor-pointer ${
+                          isUntimed
+                            ? "bg-purple-500 text-black border-purple-500 font-black shadow-[0_0_8px_rgba(168,85,247,0.4)]"
+                            : "bg-white/5 border border-white/30 text-purple-300 hover:border-purple-400"
+                        }`}
+                      >
+                        ♾️ Untimed
+                      </button>
                       {[
                         { label: "15m", mins: 15 },
                         { label: "30m", mins: 30 },
@@ -555,11 +572,12 @@ const CreateRoom = () => {
                           key={item.label}
                           type="button"
                           onClick={() => {
+                            setIsUntimed(false);
                             setDurationHours(Math.floor(item.mins / 60));
                             setDurationMinutes(item.mins % 60);
                           }}
-                          className={`px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition ${
-                            (parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0) === item.mins
+                          className={`px-1.5 sm:px-2 py-0.5 rounded text-[10px] font-mono font-bold border transition cursor-pointer ${
+                            !isUntimed && (parseInt(durationHours) || 0) * 60 + (parseInt(durationMinutes) || 0) === item.mins
                               ? "bg-orange-500 text-black border-orange-500 font-black shadow-[0_0_8px_rgba(249,115,22,0.4)]"
                               : "bg-white/5 border border-white/30 text-gray-300 hover:border-white hover:text-white"
                           }`}
@@ -568,6 +586,28 @@ const CreateRoom = () => {
                         </button>
                       ))}
                     </div>
+                  </div>
+
+                  {/* UNTIMED TOGGLE CARD */}
+                  <div className="mb-2 p-2.5 bg-black/50 border border-white/20 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm">♾️</span>
+                      <div>
+                        <div className="text-[11px] font-bold text-white uppercase tracking-wider">No Time Limit (Untimed Mode)</div>
+                        <div className="text-[9px] text-gray-400 font-mono">Contest runs continuously until winner solves all challenges or forfeits</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setIsUntimed(!isUntimed)}
+                      className={`px-3 py-1 rounded-lg text-[10px] font-mono font-bold transition border cursor-pointer ${
+                        isUntimed
+                          ? "bg-purple-500 text-black border-purple-400 font-black shadow-[0_0_10px_rgba(168,85,247,0.4)]"
+                          : "bg-white/10 text-gray-300 border-white/20 hover:border-white"
+                      }`}
+                    >
+                      {isUntimed ? "ACTIVE ♾️" : "ENABLE"}
+                    </button>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="relative flex items-center">

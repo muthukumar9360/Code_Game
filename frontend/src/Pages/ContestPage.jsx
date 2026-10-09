@@ -131,6 +131,13 @@ const ContestPage = () => {
     (battle?.roomId && battle.roomId.startsWith("RNK"))
   );
 
+  const isUntimed = Boolean(
+    battle?.isUntimed ||
+    battle?.duration === 0 ||
+    location.state?.battle?.isUntimed ||
+    location.state?.battle?.duration === 0
+  );
+
   // Team Problem Claiming State ({ [problemIndex]: claimedByUsername })
   const [teamClaims, setTeamClaims] = useState({});
 
@@ -724,9 +731,9 @@ const ContestPage = () => {
     return () => clearInterval(interval);
   }, [battle?.status, contestId, API, myUsername]);
 
-  // Countdown timer for MY time only (Standard Contests only; Ranked duels are sprints; paused during selection phase)
+  // Countdown timer for MY time only (Standard Contests only; Ranked duels are sprints; paused during selection phase or untimed matches)
   useEffect(() => {
-    if (!battle || battle.status === "finished" || isRanked || isSelectionPhase) return;
+    if (!battle || battle.status === "finished" || isRanked || isSelectionPhase || isUntimed) return;
     const t = setInterval(() => {
       setBattle((prev) => {
         if (!prev) return prev;
@@ -756,7 +763,7 @@ const ContestPage = () => {
       });
     }, 1000);
     return () => clearInterval(t);
-  }, [battle?.status, battle?.startTime, battle?.duration, myUsername, myTeam, isRanked, isSelectionPhase]);
+  }, [battle?.status, battle?.startTime, battle?.duration, myUsername, myTeam, isRanked, isSelectionPhase, isUntimed]);
 
   // Run testcases locally via Judge0 (Public testcases only)
   const runTestcases = async () => {
@@ -1065,6 +1072,18 @@ const ContestPage = () => {
                 </span>
                 <span className="text-xs font-black text-white tracking-wider">
                   First to Solve All Wins
+                </span>
+              </div>
+            </div>
+          ) : isUntimed ? (
+            <div className="flex items-center gap-2 bg-purple-950/40 px-3.5 py-1.5 rounded-xl border border-purple-500/40 shadow-[0_0_15px_rgba(168,85,247,0.15)] font-mono">
+              <span className="text-purple-400 text-xs">♾️</span>
+              <div className="flex flex-col text-right">
+                <span className="text-[8px] uppercase tracking-widest text-purple-300 font-bold">
+                  Untimed Contest
+                </span>
+                <span className="text-xs font-black text-white tracking-wider">
+                  Ends When Solved
                 </span>
               </div>
             </div>

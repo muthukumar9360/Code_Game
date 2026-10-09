@@ -23,10 +23,17 @@ export const startBattle = async (battleId) => {
 
     battle.status = 'active';
     battle.startTime = new Date();
-    // initialize per-participant timeLeft (seconds)
-    const initSeconds = (battle.duration || 30) * 60;
-    for (const p of battle.participants) {
-      if (p.timeLeft === null || p.timeLeft === undefined) p.timeLeft = initSeconds;
+    if (battle.isUntimed || battle.duration === 0) {
+      battle.isUntimed = true;
+      for (const p of battle.participants) {
+        p.timeLeft = null;
+      }
+    } else {
+      // initialize per-participant timeLeft (seconds)
+      const initSeconds = (battle.duration || 30) * 60;
+      for (const p of battle.participants) {
+        if (p.timeLeft === null || p.timeLeft === undefined) p.timeLeft = initSeconds;
+      }
     }
     await battle.save();
 
