@@ -5,8 +5,8 @@ import { jwtDecode } from "jwt-decode";
 import BackButton from "../Components/BackButton.jsx";
 
 const AdminLogin = () => {
-  const [username, setUsername] = useState("muthukumar_9360");
-  const [password, setPassword] = useState("Muthukumar12");
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -36,7 +36,7 @@ const AdminLogin = () => {
       }
 
       localStorage.setItem("adminToken", data.token);
-      localStorage.setItem("adminUsername", username.trim());
+      localStorage.setItem("adminUsername", data.admin?.username || username.trim());
       const decode = jwtDecode(data.token);
       localStorage.setItem("Role", decode.role || "admin");
 
@@ -61,7 +61,7 @@ const AdminLogin = () => {
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
           <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
-            Security Node // Port 443
+            Security Node // Secure Auth
           </span>
         </div>
       </div>
@@ -82,7 +82,7 @@ const AdminLogin = () => {
               </h1>
 
               <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6 font-sans">
-                Full administrative gateway for the Battlix Competitive Ecosystem. Manage algorithm test suites, live tournaments, problem specifications, and user permissions across all clusters.
+                Full administrative gateway for the Battlix Competitive Ecosystem. Manage algorithm test suites, live tournaments, problem specifications, and administrator permissions across all clusters.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -107,11 +107,11 @@ const AdminLogin = () => {
             <div className="bg-white/5 border border-white/10 p-4 rounded-2xl font-mono text-xs space-y-1">
               <div className="flex items-center gap-2 text-gray-300">
                 <FaCheckCircle className="text-emerald-400" />
-                <span>Default Operator ID: <strong className="text-orange-400">muthukumar_9360</strong></span>
+                <span>Database Verification: <strong className="text-emerald-400">Armed & Encrypted</strong></span>
               </div>
               <div className="flex items-center gap-2 text-gray-300">
                 <FaUserCheck className="text-emerald-400" />
-                <span>Security Token: <strong className="text-orange-400">••••••••••••</strong></span>
+                <span>Access Protocol: <strong className="text-orange-400">Zero-Trust Role Verification</strong></span>
               </div>
             </div>
           </div>
@@ -123,7 +123,7 @@ const AdminLogin = () => {
                 <FaTerminal /> Terminal Access
               </div>
               <h2 className="text-2xl font-black uppercase text-white">Operator Sign-In</h2>
-              <p className="text-gray-400 text-xs">Enter your administrative credentials</p>
+              <p className="text-gray-400 text-xs">Enter your administrative credentials to continue</p>
             </div>
 
             {error && (
@@ -140,11 +140,12 @@ const AdminLogin = () => {
                 </label>
                 <input
                   type="text"
-                  placeholder="muthukumar_9360"
+                  placeholder="Enter admin username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   className="w-full bg-black/60 border border-white/15 focus:border-orange-500 rounded-xl px-4 py-3 text-white outline-none font-mono text-sm transition"
                   required
+                  autoFocus
                 />
               </div>
 
@@ -154,7 +155,7 @@ const AdminLogin = () => {
                 </label>
                 <input
                   type={showPassword ? "text" : "password"}
-                  placeholder="Muthukumar12"
+                  placeholder="Enter admin password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className="w-full bg-black/60 border border-white/15 focus:border-orange-500 rounded-xl px-4 py-3 text-white outline-none font-mono text-sm pr-12 transition"

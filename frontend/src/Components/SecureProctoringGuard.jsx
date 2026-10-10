@@ -3,9 +3,10 @@ import { FaShieldAlt, FaExpand, FaExclamationTriangle, FaLock, FaBan, FaRedo, Fa
 
 /**
  * STRICT_FULLSCREEN_LOCKDOWN Flag:
- * Active full-screen lockdown with Skillrack-style 10-second warning countdown.
+ * Set to false temporarily for screen recording / demo testing.
+ * When false, fullscreen requirements and tab-switching terminations are paused.
  */
-export const STRICT_FULLSCREEN_LOCKDOWN = true;
+export const STRICT_FULLSCREEN_LOCKDOWN = false;
 
 export const useSecureProctoring = ({
   onTerminate,
