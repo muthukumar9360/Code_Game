@@ -1,6 +1,6 @@
-# Battlix Code Game - Stop All Services
+# Battlix Code Game - Stop All Background Services
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  Stopping Battlix Backend and Frontend Services..." -ForegroundColor Yellow
+Write-Host "  Stopping Battlix Background Services..." -ForegroundColor Yellow
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -10,7 +10,7 @@ if ($port5000) {
     $port5000.OwningProcess | Select-Object -Unique | ForEach-Object {
         Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
     }
-    Write-Host "[OK] Stopped Backend process on Port 5000" -ForegroundColor Green
+    Write-Host "[OK] Stopped Backend (Port 5000)" -ForegroundColor Green
 } else {
     Write-Host "[INFO] Port 5000 was already free" -ForegroundColor Gray
 }
@@ -21,7 +21,7 @@ if ($port5173) {
     $port5173.OwningProcess | Select-Object -Unique | ForEach-Object {
         Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
     }
-    Write-Host "[OK] Stopped Frontend process on Port 5173" -ForegroundColor Green
+    Write-Host "[OK] Stopped Frontend (Port 5173)" -ForegroundColor Green
 } else {
     Write-Host "[INFO] Port 5173 was already free" -ForegroundColor Gray
 }
@@ -37,5 +37,5 @@ foreach ($l in $lines) {
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Green
-Write-Host "  SUCCESS: All Battlix services have been stopped!" -ForegroundColor Green
+Write-Host "  SUCCESS: All background services have been stopped!" -ForegroundColor Green
 Write-Host "========================================================" -ForegroundColor Green

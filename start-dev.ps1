@@ -5,5 +5,5 @@ Write-Host "  Backend:  http://localhost:5000 (watch mode)" -ForegroundColor Yel
 Write-Host "  Frontend: http://localhost:5173 (Vite HMR)" -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
-
-npm run dev
+Set-Location $PSScriptRoot
+& "C:\Program Files\nodejs\npm.cmd" run dev

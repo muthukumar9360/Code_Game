@@ -1,34 +1,18 @@
 @echo off
-title Battlix Code Game - Launch Services
-echo ========================================================
-echo   Starting Battlix Backend and Frontend Independently
-echo   (These will stay running even if Antigravity is closed)
-echo ========================================================
-echo.
-
+title Battlix Code Game - Launch Services Silently
 set "PROJECT_ROOT=%~dp0"
 cd /d "%PROJECT_ROOT%"
 
-:: Start Backend in a detached, persistent window
-echo [1/2] Starting Backend on http://localhost:5000 ...
-start "Battlix Backend (Port 5000)" cmd /k "cd /d "%PROJECT_ROOT%backend" && npm run dev"
+:: Stop any previous processes on ports 5000 and 5173
+powershell -NoProfile -ExecutionPolicy Bypass -Command "Get-NetTCPConnection -LocalPort 5000,5173 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }"
 
-:: Small delay to allow backend to bind port cleanly
-timeout /t 2 /nobreak >nul
+:: Launch npm run dev completely hidden in the background (0 = SW_HIDE, zero windows)
+powershell -NoProfile -ExecutionPolicy Bypass -Command "$ws = New-Object -ComObject WScript.Shell; $ws.Run('cmd /c cd /d ""%PROJECT_ROOT%"" && npm run dev', 0, $false)"
 
-:: Start Frontend in a detached, persistent window
-echo [2/2] Starting Frontend on http://localhost:5173 ...
-start "Battlix Frontend (Port 5173)" cmd /k "cd /d "%PROJECT_ROOT%frontend" && npm run dev"
+:: Wait 3 seconds for Vite and Backend to initialize
+timeout /t 3 /nobreak >nul
 
-echo.
-echo ========================================================
-echo   SUCCESS: Both services are running in separate windows!
-echo   - Backend:  http://localhost:5000
-echo   - Frontend: http://localhost:5173
-echo.
-echo   You can now safely close Antigravity IDE and record.
-echo   When finished recording, run 'stop-servers.bat' to stop.
-echo ========================================================
-echo.
-timeout /t 4
+:: Open Chrome directly to http://localhost:5173
+start "" "http://localhost:5173"
+
 exit

@@ -1,28 +1,36 @@
-# Battlix Code Game - Launch Services Independently
+# Battlix Code Game - Launch Services Silently in Background (Zero Windows)
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  Starting Battlix Backend and Frontend Independently" -ForegroundColor Green
-Write-Host "  (These will stay running even if Antigravity is closed)" -ForegroundColor Gray
+Write-Host "  Starting Battlix Services Silently in Background" -ForegroundColor Green
+Write-Host "  (Zero extra windows - only your browser will open)" -ForegroundColor Yellow
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
 
 $ProjectRoot = $PSScriptRoot
 
-# Start Backend in independent window
-Write-Host "[1/2] Starting Backend on http://localhost:5000 ..." -ForegroundColor Yellow
-Start-Process cmd.exe -ArgumentList "/k cd /d `"$ProjectRoot\backend`" && npm run dev"
+# Clean up any lingering processes on ports 5000 and 5173 first
+$old = Get-NetTCPConnection -LocalPort 5000,5173 -ErrorAction SilentlyContinue
+if ($old) {
+    $old.OwningProcess | Select-Object -Unique | ForEach-Object {
+        Stop-Process -Id $_ -Force -ErrorAction SilentlyContinue
+    }
+}
 
-Start-Sleep -Seconds 2
+# Launch concurrently in background with SW_HIDE (0 = completely invisible, zero windows)
+$ws = New-Object -ComObject WScript.Shell
+$ws.Run("cmd /c cd /d `"$ProjectRoot`" && npm run dev", 0, $false)
 
-# Start Frontend in independent window
-Write-Host "[2/2] Starting Frontend on http://localhost:5173 ..." -ForegroundColor Cyan
-Start-Process cmd.exe -ArgumentList "/k cd /d `"$ProjectRoot\frontend`" && npm run dev"
+# Wait 3 seconds for Vite & Backend to initialize
+Start-Sleep -Seconds 3
+
+# Launch Chrome / Default Browser directly to localhost:5173
+Start-Process "http://localhost:5173"
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Green
-Write-Host "  SUCCESS: Both services are running in separate windows!" -ForegroundColor Green
-Write-Host "  - Backend:  http://localhost:5000" -ForegroundColor Yellow
-Write-Host "  - Frontend: http://localhost:5173" -ForegroundColor Cyan
+Write-Host "  SUCCESS: Backend & Frontend are running in background!" -ForegroundColor Green
+Write-Host "  Only your browser is open: http://localhost:5173" -ForegroundColor Cyan
+Write-Host "  Zero extra command prompt windows are on your screen." -ForegroundColor White
 Write-Host ""
-Write-Host "  You can now safely close Antigravity IDE and record." -ForegroundColor White
-Write-Host "  When finished recording, run '.\stop-servers.ps1' or 'stop-servers.bat'." -ForegroundColor Gray
+Write-Host "  You can now close Antigravity IDE and record freely." -ForegroundColor White
+Write-Host "  When finished recording, run: .\stop-servers.ps1" -ForegroundColor Yellow
 Write-Host "========================================================" -ForegroundColor Green
