@@ -103,7 +103,7 @@ const AdminHome = () => {
                 </button>
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 transition"
+                  className="w-full text-left px-4 py-3 hover:bg-orange-500/10 text-orange-500 transition"
                 >
                   Logout
                 </button>

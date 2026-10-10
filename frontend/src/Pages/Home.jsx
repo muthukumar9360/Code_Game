@@ -143,10 +143,10 @@ const Home = () => {
           {/* ADMIN LOGIN BUTTON */}
           <button
             onClick={() => navigate("/admin/login")}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-red-600/30 to-orange-600/30 hover:from-red-600 hover:to-orange-600 border border-red-500/50 hover:border-orange-400 text-red-200 hover:text-white rounded-xl text-xs font-mono font-bold transition shadow-[0_0_15px_rgba(239,68,68,0.25)] hover:shadow-[0_0_20px_rgba(249,115,22,0.5)] cursor-pointer"
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-orange-500/20 to-amber-500/20 hover:from-orange-500 hover:to-amber-500 border border-orange-500/40 hover:border-amber-400 text-orange-400 hover:text-white rounded-xl text-xs font-mono font-bold transition shadow-sm hover:shadow-[0_0_20px_rgba(249,115,22,0.4)] cursor-pointer"
             title="Administrator Control Console"
           >
-            <FaShieldAlt className="text-red-400 text-xs shrink-0" />
+            <FaShieldAlt className="text-orange-400 text-xs shrink-0" />
             <span className="hidden sm:inline">Admin Login</span>
             <span className="sm:hidden">Admin</span>
           </button>
@@ -175,7 +175,7 @@ const Home = () => {
                     </div>
                     <button onClick={() => navigate("/contest-management")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs font-mono text-orange-400">Contest Manager</button>
                     <button onClick={() => navigate("/profile")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">My Profile</button>
-                    <button onClick={logout} className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 transition text-xs font-bold">Logout</button>
+                    <button onClick={logout} className="w-full text-left px-4 py-3 hover:bg-orange-500/10 text-orange-500 transition text-xs font-bold">Logout</button>
                   </>
                 )}
               </div>

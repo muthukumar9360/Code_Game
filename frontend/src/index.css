@@ -1,6 +1,10 @@
 @import "tailwindcss";
 
-/* High-contrast text in Dark mode */
+/* ========================================================
+   THEME-ADAPTIVE COLOR & CONTRAST FOUNDATION
+   ======================================================== */
+
+/* High-contrast base text in Dark mode (default) */
 html:not(.light) .text-gray-300,
 html:not(.light) .text-gray-400,
 html:not(.light) .text-gray-500,
@@ -11,6 +15,28 @@ html:not(.light) .text-zinc-300,
 html:not(.light) .text-zinc-400,
 html:not(.light) .text-zinc-500 {
   color: #ffffff !important;
+}
+
+/* ========================================================
+   DARK THEME: WHITE / TRANSLUCENT-WHITE BORDERS
+   ======================================================== */
+html:not(.light) .border,
+html:not(.light) .border-2,
+html:not(.light) .border-4,
+html:not(.light) .border-t,
+html:not(.light) .border-b,
+html:not(.light) .border-l,
+html:not(.light) .border-r,
+html:not(.light) [class*="border-"] {
+  border-color: rgba(255, 255, 255, 0.25) !important;
+}
+
+html:not(.light) .border-transparent {
+  border-color: transparent !important;
+}
+
+html:not(.light) .border-none {
+  border: none !important;
 }
 
 html,
@@ -34,13 +60,15 @@ html.light #root {
   color: #0f172a !important;
 }
 
+/* Structural backgrounds in light theme */
 html.light .bg-\[\#050b10\] {
   background-color: #f1f5f9 !important;
 }
 
 html.light .bg-\[\#0a1118\],
 html.light .bg-\[\#0a1118\]\/80,
-html.light .bg-\[\#0a1118\]\/90 {
+html.light .bg-\[\#0a1118\]\/90,
+html.light .bg-\[\#0a1118\]\/95 {
   background-color: #ffffff !important;
 }
 
@@ -62,19 +90,40 @@ html.light .text-slate-500,
 html.light .text-zinc-300,
 html.light .text-zinc-400,
 html.light .text-zinc-500 {
-  color: #475569 !important;
+  color: #334155 !important;
 }
 
-html.light .border-white,
-html.light .border-white\/10,
-html.light .border-white\/15,
-html.light .border-white\/20,
-html.light .border-white\/30,
-html.light .border-white\/40,
-html.light .border-white\/50 {
-  border-color: #cbd5e1 !important;
+/* ========================================================
+   LIGHT THEME: CRISP SOLID BLACK BORDERS FOR ALL ELEMENTS
+   ======================================================== */
+html.light .border,
+html.light .border-2,
+html.light .border-4,
+html.light .border-t,
+html.light .border-b,
+html.light .border-l,
+html.light .border-r,
+html.light [class*="border-"],
+html.light input,
+html.light textarea,
+html.light select,
+html.light pre,
+html.light table,
+html.light th,
+html.light td,
+html.light hr {
+  border-color: #000000 !important; /* Bold, crisp solid black border across all components */
 }
 
+html.light .border-transparent {
+  border-color: transparent !important;
+}
+
+html.light .border-none {
+  border: none !important;
+}
+
+/* Translucent surfaces in light theme */
 html.light .bg-white\/5,
 html.light .bg-white\/10,
 html.light .bg-white\/15,
@@ -93,24 +142,179 @@ html.light .bg-black\/85,
 html.light .bg-black\/90 {
   background-color: #f8fafc !important;
   color: #0f172a !important;
+  border-color: #000000 !important;
 }
 
+/* Form inputs & editors in light mode */
 html.light pre,
 html.light input:not([type="checkbox"]),
 html.light textarea,
 html.light select {
   background-color: #ffffff !important;
   color: #0f172a !important;
-  border-color: #cbd5e1 !important;
+  border-color: #000000 !important;
 }
 
 html.light nav {
   background-color: rgba(255, 255, 255, 0.95) !important;
-  border-color: #e2e8f0 !important;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  border-color: #000000 !important;
+  box-shadow: 0 1px 4px 0 rgba(0, 0, 0, 0.08);
 }
 
-/* Custom sleek high-visibility scrollbar / sliders */
+/* ========================================================
+   UNIVERSAL COLOR HARMONIZATION (COMMON TO BOTH THEMES)
+   Replaces washed-out/unsuitable reds with warm, rich amber/orange
+   and high-contrast tones that look beautiful and clear on both.
+   ======================================================== */
+
+/* Replaced Red text: mapped to warm, rich, high-contrast universal colors */
+html.light .text-red-200,
+html.light .text-red-300,
+html.light .text-red-400,
+html.light .text-red-500,
+html.light .text-red-600,
+html.light .text-rose-400,
+html.light .text-rose-500 {
+  color: #c2410c !important; /* Deep warm amber/burnt orange: high-contrast & elegant on white */
+}
+
+html:not(.light) .text-red-200,
+html:not(.light) .text-red-300,
+html:not(.light) .text-red-400,
+html:not(.light) .text-red-500,
+html:not(.light) .text-rose-400,
+html:not(.light) .text-rose-500 {
+  color: #fb923c !important; /* Luminous warm amber/orange on dark */
+}
+
+/* Red backgrounds & alert containers converted to warm ambient tint */
+html.light .bg-red-500\/10,
+html.light .bg-red-500\/15,
+html.light .bg-red-500\/20,
+html.light .bg-red-600\/10,
+html.light .bg-red-600\/20,
+html.light .bg-red-950,
+html.light .bg-red-950\/40,
+html.light .bg-red-950\/60,
+html.light .bg-red-950\/85,
+html.light .bg-red-950\/90 {
+  background-color: #ffedd5 !important;
+  color: #c2410c !important;
+  border-color: #000000 !important;
+}
+
+/* Orange text & badges: rich burnt orange with high contrast in both themes */
+html.light .text-orange-300,
+html.light .text-orange-400 {
+  color: #c2410c !important; /* Deep bronze orange on white */
+}
+
+html.light .text-orange-500 {
+  color: #ea580c !important;
+}
+
+html.light .bg-orange-500\/10,
+html.light .bg-orange-500\/15,
+html.light .bg-orange-500\/20 {
+  background-color: #ffedd5 !important;
+  color: #c2410c !important;
+  border-color: #000000 !important;
+}
+
+/* Amber / Yellow: deep rich amber-bronze on light, bright golden on dark */
+html.light .text-yellow-300,
+html.light .text-yellow-400,
+html.light .text-yellow-500,
+html.light .text-amber-300,
+html.light .text-amber-400,
+html.light .text-amber-500 {
+  color: #b45309 !important; /* High contrast amber on white */
+}
+
+html:not(.light) .text-yellow-300,
+html:not(.light) .text-yellow-400,
+html:not(.light) .text-amber-300,
+html:not(.light) .text-amber-400 {
+  color: #fbbf24 !important;
+}
+
+html.light .bg-yellow-500\/10,
+html.light .bg-yellow-500\/20,
+html.light .bg-amber-500\/10,
+html.light .bg-amber-500\/20 {
+  background-color: #fef3c7 !important;
+  color: #92400e !important;
+  border-color: #000000 !important;
+}
+
+/* Green / Emerald: rich forest emerald in light mode, vivid emerald in dark */
+html.light .text-green-300,
+html.light .text-green-400,
+html.light .text-green-500,
+html.light .text-emerald-300,
+html.light .text-emerald-400,
+html.light .text-emerald-500 {
+  color: #15803d !important; /* Deep forest emerald on white */
+}
+
+html:not(.light) .text-green-300,
+html:not(.light) .text-green-400,
+html:not(.light) .text-emerald-300,
+html:not(.light) .text-emerald-400 {
+  color: #34d399 !important;
+}
+
+html.light .bg-emerald-500\/10,
+html.light .bg-emerald-500\/15,
+html.light .bg-emerald-500\/20,
+html.light .bg-green-500\/10,
+html.light .bg-green-500\/15,
+html.light .bg-green-500\/20 {
+  background-color: #dcfce7 !important;
+  color: #166534 !important;
+  border-color: #000000 !important;
+}
+
+/* Blue / Cyan: deep royal sapphire on light, vivid cyan on dark */
+html.light .text-blue-300,
+html.light .text-blue-400,
+html.light .text-blue-500,
+html.light .text-cyan-300,
+html.light .text-cyan-400 {
+  color: #1d4ed8 !important; /* Deep sapphire blue on white */
+}
+
+html:not(.light) .text-blue-300,
+html:not(.light) .text-blue-400,
+html:not(.light) .text-cyan-300,
+html:not(.light) .text-cyan-400 {
+  color: #60a5fa !important;
+}
+
+html.light .bg-blue-500\/10,
+html.light .bg-blue-500\/15,
+html.light .bg-blue-500\/20,
+html.light .bg-blue-950\/40 {
+  background-color: #dbeafe !important;
+  color: #1e40af !important;
+  border-color: #000000 !important;
+}
+
+/* Purple / Violet: deep royal violet on light, vivid lilac on dark */
+html.light .text-purple-300,
+html.light .text-purple-400,
+html.light .text-purple-500 {
+  color: #7e22ce !important; /* Deep violet */
+}
+
+html:not(.light) .text-purple-300,
+html:not(.light) .text-purple-400 {
+  color: #c084fc !important;
+}
+
+/* ========================================================
+   SCROLLBAR STYLING FOR BOTH THEMES
+   ======================================================== */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
@@ -132,8 +336,8 @@ html.light ::-webkit-scrollbar-track {
 }
 
 html.light ::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(0, 0, 0, 0.05);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 ::-webkit-scrollbar-thumb:hover {
@@ -161,8 +365,8 @@ html.light .custom-scrollbar::-webkit-scrollbar-track {
 }
 
 html.light .custom-scrollbar::-webkit-scrollbar-thumb {
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 0, 0, 0.1);
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb:hover {

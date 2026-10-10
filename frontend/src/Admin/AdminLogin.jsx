@@ -52,18 +52,12 @@ const AdminLogin = () => {
   return (
     <div className="min-h-screen w-full flex flex-col justify-start bg-[#050b10] text-white p-4 sm:p-8 font-sans relative">
       {/* BACKGROUND ACCENTS */}
-      <div className="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-red-600/10 blur-[150px] rounded-full pointer-events-none"></div>
-      <div className="fixed bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-orange-600/10 blur-[150px] rounded-full pointer-events-none"></div>
+      <div className="fixed top-[-10%] right-[-10%] w-[500px] h-[500px] bg-orange-600/10 blur-[150px] rounded-full pointer-events-none"></div>
+      <div className="fixed bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-amber-600/10 blur-[150px] rounded-full pointer-events-none"></div>
 
       {/* TOP HEADER BAR */}
       <div className="w-full flex justify-between items-center mb-8 z-20 pb-4 border-b border-white/10">
         <BackButton to="/" label="Exit to Battlix Home" />
-        <div className="flex items-center gap-2">
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
-          <span className="font-mono text-xs text-gray-400 uppercase tracking-widest">
-            Security Node // Secure Auth
-          </span>
-        </div>
       </div>
 
       {/* FULL-WIDTH OPERATOR CONSOLE CONTAINER */}
@@ -73,16 +67,16 @@ const AdminLogin = () => {
           {/* LEFT SYSTEM HERO / OPERATOR CLEARANCE INFO (LG: 7 COLS) */}
           <div className="lg:col-span-7 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-white/10 pb-8 lg:pb-0 lg:pr-10">
             <div>
-              <div className="inline-flex items-center gap-2 text-red-400 text-xs font-mono uppercase tracking-widest px-3.5 py-1 rounded-full bg-red-500/10 border border-red-500/30 mb-4 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+              <div className="inline-flex items-center gap-2 text-amber-500 text-xs font-mono uppercase tracking-widest px-3.5 py-1 rounded-full bg-amber-500/10 border border-amber-500/30 mb-4 shadow-sm">
                 <FaShieldAlt /> Authorized Personnel Only
               </div>
 
               <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight italic text-white mb-4">
-                BATT<span className="text-orange-500">LIX</span> <span className="text-red-500">ADMIN</span>
+                BATT<span className="text-orange-500">LIX</span> <span className="text-amber-500">ADMIN</span>
               </h1>
 
               <p className="text-gray-300 text-sm sm:text-base leading-relaxed mb-6 font-sans">
-                Full administrative gateway for the Battlix Competitive Ecosystem. Manage algorithm test suites, live tournaments, problem specifications, and administrator permissions across all clusters.
+                Full administrative gateway for the Battlix Competitive Ecosystem.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-6">
@@ -95,7 +89,7 @@ const AdminLogin = () => {
                 </div>
 
                 <div className="bg-black/50 border border-white/10 p-3.5 rounded-2xl flex items-start gap-3">
-                  <FaLock className="text-red-400 mt-1 shrink-0 text-lg" />
+                  <FaLock className="text-amber-500 mt-1 shrink-0 text-lg" />
                   <div>
                     <h4 className="text-xs font-bold text-white uppercase font-mono">Arena Control</h4>
                     <p className="text-[11px] text-gray-400 mt-0.5">Monitor multi-question contests, extend times, and oversee rooms.</p>
@@ -127,7 +121,7 @@ const AdminLogin = () => {
             </div>
 
             {error && (
-              <div className="p-3.5 bg-red-500/15 border border-red-500/40 rounded-xl text-red-300 text-xs mb-5 flex items-center gap-2.5 animate-shake">
+              <div className="p-3.5 bg-amber-500/15 border border-amber-500/40 rounded-xl text-amber-500 text-xs mb-5 flex items-center gap-2.5 animate-shake">
                 <FaShieldAlt className="shrink-0 text-sm" />
                 <span>{error}</span>
               </div>
@@ -173,7 +167,7 @@ const AdminLogin = () => {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 mt-2 bg-gradient-to-r from-red-600 via-orange-600 to-amber-600 hover:from-red-500 hover:to-amber-500 text-white font-black font-mono text-sm uppercase tracking-wider rounded-xl transition shadow-[0_0_20px_rgba(239,68,68,0.3)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                className="w-full py-3.5 mt-2 bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-500 hover:from-orange-400 hover:to-amber-400 text-white font-black font-mono text-sm uppercase tracking-wider rounded-xl transition shadow-[0_0_20px_rgba(249,115,22,0.3)] hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 cursor-pointer"
               >
                 {loading ? "Authorizing Operator..." : "Authorize Admin Access →"}
               </button>
