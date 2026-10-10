@@ -219,24 +219,50 @@ const ProblemSolve = () => {
     }
   };
 
-  // Handle language switch with starter code
+  const [codeByLang, setCodeByLang] = useState(() => ({
+    python: STARTER_CODES.python,
+    javascript: STARTER_CODES.javascript,
+    cpp: STARTER_CODES.cpp,
+    java: STARTER_CODES.java,
+    c: STARTER_CODES.c
+  }));
+
+  // Handle language switch with per-language code preservation and language-mismatch prevention
   const handleLanguageChange = (newLang) => {
+    if (!newLang || newLang === language) return;
+
+    // 1. Save current code for current language
+    setCodeByLang(prev => ({
+      ...prev,
+      [language]: code
+    }));
+    try {
+      localStorage.setItem(`practice_code_${slug}_${language}`, code);
+    } catch (e) {}
+
+    // 2. Retrieve code for target language
+    const savedCode = localStorage.getItem(`practice_code_${slug}_${newLang}`) || codeByLang[newLang];
+
+    // Verify code doesn't belong to another language (e.g. prevent python precode leaking into java)
+    const isMismatched = (
+      !savedCode ||
+      (newLang === 'java' && (savedCode.includes('def solve():') || savedCode.includes('import sys') || savedCode.includes('#include'))) ||
+      (newLang === 'python' && (savedCode.includes('public class Main') || savedCode.includes('#include') || savedCode.includes('std::'))) ||
+      (newLang === 'cpp' && (savedCode.includes('def solve():') || savedCode.includes('public class Main'))) ||
+      (newLang === 'c' && (savedCode.includes('def solve():') || savedCode.includes('public class Main'))) ||
+      (newLang === 'javascript' && (savedCode.includes('def solve():') || savedCode.includes('public class Main') || savedCode.includes('#include')))
+    );
+
+    const targetCode = isMismatched ? (STARTER_CODES[newLang] || "") : savedCode;
+
     setLanguage(newLang);
-    const isStarter = Object.values(STARTER_CODES).some(c => c.trim() === code.trim());
-    if (!code.trim() || isStarter) {
-      setCode(STARTER_CODES[newLang] || "");
-    }
+    setCode(targetCode);
   };
 
   // Run Public Testcases (Does NOT mark problem as solved)
   const runTestcases = async () => {
     if (!problem) return;
     const token = localStorage.getItem("token");
-    if (!token) {
-      alert("Please log in to run testcases and solve problems.");
-      navigate("/login");
-      return;
-    }
     setLoading(true);
     setResults([]);
     setDebugOutput("> RUN CODE: Executing against 3 Public Testcases...\n");
@@ -246,7 +272,7 @@ const ProblemSolve = () => {
         code,
         language
       }, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
 
       const data = res.data;

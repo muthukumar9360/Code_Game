@@ -1,6 +1,6 @@
 import express from "express";
 import adminAuth from "../middleware/Adminauth.js";
-import { authMiddleware } from "../middleware/auth.js";
+import { authMiddleware, optionalAuthMiddleware } from "../middleware/auth.js";
 import {
   createProblem,
   getAllProblemsForAdmin,
@@ -22,10 +22,10 @@ const router = express.Router();
 // Public / User routes
 router.get("/", getAllProblemsForUser);
 router.get("/categories", getProblemCategories);
-router.get("/daily", getDailyProblem);
+router.get("/daily", optionalAuthMiddleware, getDailyProblem);
 router.post("/daily/complete", authMiddleware, completeDailyProblem);
 router.get("/:slug", getProblemBySlug);
-router.post("/:slug/run", authMiddleware, runPublicTestcases);
+router.post("/:slug/run", optionalAuthMiddleware, runPublicTestcases);
 router.post("/:slug/submit", authMiddleware, submitPracticeSolution);
 router.post("/:slug/hint", authMiddleware, getProblemHint);
 router.post("/:slug/explain", authMiddleware, getCodeExplanation);

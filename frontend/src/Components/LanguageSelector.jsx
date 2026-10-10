@@ -32,8 +32,8 @@ export const LANGUAGES = [
     name: "Java",
     version: "JDK 17",
     icon: FaJava,
-    iconColor: "text-red-400",
-    badgeColor: "bg-red-500/10 text-red-400 border-red-500/30"
+    iconColor: "text-orange-400",
+    badgeColor: "bg-orange-500/10 text-orange-400 border-orange-500/30"
   },
   {
     id: "c",

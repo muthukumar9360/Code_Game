@@ -298,12 +298,26 @@ const ContestPage = () => {
   const loadDraftForProblem = useCallback((probId, lang) => {
     const sKey = getDraftStorageKey(probId, lang);
     const localVal = localStorage.getItem(sKey);
-    if (localVal && localVal.trim()) return localVal;
+
+    const isMismatched = (val) => {
+      if (!val) return true;
+      if (lang === 'java' && (val.includes('def solve():') || val.includes('import sys') || val.includes('#include'))) return true;
+      if (lang === 'python' && (val.includes('public class Main') || val.includes('#include') || val.includes('std::'))) return true;
+      if (lang === 'cpp' && (val.includes('def solve():') || val.includes('public class Main'))) return true;
+      if (lang === 'c' && (val.includes('def solve():') || val.includes('public class Main'))) return true;
+      if (lang === 'javascript' && (val.includes('def solve():') || val.includes('public class Main') || val.includes('#include'))) return true;
+      return false;
+    };
+
+    if (localVal && localVal.trim() && !isMismatched(localVal)) return localVal;
+
+    const serverValByLang = battle?.myDrafts?.[`${probId}_${lang}`];
+    if (serverValByLang && serverValByLang.trim() && !isMismatched(serverValByLang)) return serverValByLang;
 
     const serverVal = battle?.myDrafts?.[probId];
-    if (serverVal && serverVal.trim()) return serverVal;
+    if (serverVal && serverVal.trim() && !isMismatched(serverVal)) return serverVal;
 
-    if (codeMap[probId]?.[lang]) return codeMap[probId][lang];
+    if (codeMap[probId]?.[lang] && !isMismatched(codeMap[probId][lang])) return codeMap[probId][lang];
 
     return STARTER_CODES[lang] || "";
   }, [getDraftStorageKey, battle?.myDrafts, codeMap]);

@@ -188,10 +188,43 @@ const DailyBlitz = () => {
     fetchDaily();
   }, [API]);
 
-  // Handle language switch
-  const handleLanguageChange = (lang) => {
-    setLanguage(lang);
-    setCode(STARTER_CODES[lang] || "");
+  const [codeByLang, setCodeByLang] = useState(() => ({
+    python: STARTER_CODES.python,
+    javascript: STARTER_CODES.javascript,
+    cpp: STARTER_CODES.cpp,
+    java: STARTER_CODES.java,
+    c: STARTER_CODES.c
+  }));
+
+  // Handle language switch with per-language code preservation and language-mismatch prevention
+  const handleLanguageChange = (newLang) => {
+    if (!newLang || newLang === language) return;
+
+    setCodeByLang(prev => ({
+      ...prev,
+      [language]: code
+    }));
+    try {
+      if (problem?.slug) {
+        localStorage.setItem(`daily_code_${problem.slug}_${language}`, code);
+      }
+    } catch (e) {}
+
+    const savedCode = (problem?.slug && localStorage.getItem(`daily_code_${problem.slug}_${newLang}`)) || codeByLang[newLang];
+
+    const isMismatched = (
+      !savedCode ||
+      (newLang === 'java' && (savedCode.includes('def solve():') || savedCode.includes('import sys') || savedCode.includes('#include'))) ||
+      (newLang === 'python' && (savedCode.includes('public class Main') || savedCode.includes('#include') || savedCode.includes('std::'))) ||
+      (newLang === 'cpp' && (savedCode.includes('def solve():') || savedCode.includes('public class Main'))) ||
+      (newLang === 'c' && (savedCode.includes('def solve():') || savedCode.includes('public class Main'))) ||
+      (newLang === 'javascript' && (savedCode.includes('def solve():') || savedCode.includes('public class Main') || savedCode.includes('#include')))
+    );
+
+    const targetCode = isMismatched ? (STARTER_CODES[newLang] || "") : savedCode;
+
+    setLanguage(newLang);
+    setCode(targetCode);
   };
 
   // Run Public Testcases (Does NOT solve challenge or increment streak)
@@ -199,12 +232,14 @@ const DailyBlitz = () => {
     if (!problem?.slug) return;
     setSubmitting(true);
     setDebugOutput("> RUN CODE: Executing solution against Public Testcases...\n");
+    const token = localStorage.getItem("token");
 
     try {
-      const res = await axios.post(`${API}/api/problems/${problem.slug}/run`, {
-        code,
-        language
-      });
+      const res = await axios.post(
+        `${API}/api/problems/${problem.slug}/run`,
+        { code, language },
+        { headers: token ? { Authorization: `Bearer ${token}` } : {} }
+      );
 
       if (res.data?.results) {
         setResults(res.data.results);
@@ -256,7 +291,9 @@ const DailyBlitz = () => {
             prev +
             `====================================================\n` +
             `>>> DAILY CHALLENGE ACCEPTED! <<<\n` +
-            `All private testcases passed! Streak updated: ${res.data.streakCount} days!\n` +
+            (res.data.alreadySolved 
+              ? `Intimation: You already solved today's challenge earlier! Practice submission verified.\n` 
+              : `All private testcases passed! Streak updated: ${res.data.streakCount} days!\n`) +
             `====================================================\n`
         );
       }
@@ -383,6 +420,26 @@ const DailyBlitz = () => {
             </span>
           </div>
 
+          {/* ALREADY SOLVED INTIMATION BANNER */}
+          {isAlreadySolved && (
+            <div className="bg-emerald-500/10 border-2 border-emerald-500/40 rounded-2xl p-3.5 shrink-0 flex items-start gap-3 shadow-md animate-in fade-in">
+              <FaCheckCircle className="text-emerald-400 text-lg shrink-0 mt-0.5" />
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black uppercase tracking-wider text-emerald-400 font-mono">
+                    Daily Challenge Completed
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9px] font-bold uppercase tracking-wider font-mono">
+                    Already Solved Today
+                  </span>
+                </div>
+                <p className="text-[11px] text-gray-300 mt-1 leading-snug font-sans">
+                  You already conquered today's challenge ({dailyDate}) and claimed your daily streak. You are currently in <strong>Re-Solve Practice Mode</strong>: you can run testcases and practice other languages freely!
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="overflow-y-auto custom-scrollbar space-y-4 flex-1 min-h-0 pr-1">
             <h2 className="text-xl font-black text-white">{problem?.title}</h2>
             <p className="text-xs text-gray-300 leading-relaxed font-sans">
@@ -496,13 +553,15 @@ const DailyBlitz = () => {
             </div>
 
             <span className="text-[10px] font-mono uppercase tracking-[0.3em] text-yellow-400 font-bold">
-              DAILY DIRECTIVE ACCOMPLISHED
+              {victoryStats?.alreadySolved ? "RE-SOLVE VERIFIED // INTIMATION" : "DAILY DIRECTIVE ACCOMPLISHED"}
             </span>
             <h2 className="text-2xl font-black text-white mt-1 mb-2">
-              Daily Challenge Solved!
+              {victoryStats?.alreadySolved ? "Challenge Re-Solved!" : "Daily Challenge Solved!"}
             </h2>
             <p className="text-xs text-white mb-6">
-              You verified all testcases, solved today's algorithmic directive, and preserved your daily streak!
+              {victoryStats?.alreadySolved
+                ? "You verified all private testcases again! Note: Today's streak and XP were already claimed earlier today."
+                : "You verified all testcases, solved today's algorithmic directive, and preserved your daily streak!"}
             </p>
 
             {/* STREAK & BADGE CARDS */}
