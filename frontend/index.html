@@ -6,6 +6,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f97316" />
     <title>Battlix: Competitive Coding Arena</title>
+    <script>
+      (function() {
+        try {
+          var t = localStorage.getItem('battlix_theme');
+          if (t === 'light') {
+            document.documentElement.classList.add('light');
+          } else {
+            document.documentElement.classList.remove('light');
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body class="bg-[#050b10] text-white min-h-screen">
     <div id="root" class="min-h-screen bg-[#050b10]"></div>

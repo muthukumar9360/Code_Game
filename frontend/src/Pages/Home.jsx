@@ -24,6 +24,21 @@ const Home = () => {
   const API = import.meta.env.VITE_API_URL;
   const socketRef = useRef(null);
 
+  const [theme, setTheme] = useState(() => localStorage.getItem("battlix_theme") || "dark");
+
+  const toggleTheme = () => {
+    const nextTheme = theme === "dark" ? "light" : "dark";
+    setTheme(nextTheme);
+    localStorage.setItem("battlix_theme", nextTheme);
+    if (nextTheme === "light") {
+      document.documentElement.classList.add("light");
+      document.documentElement.classList.remove("dark");
+    } else {
+      document.documentElement.classList.add("dark");
+      document.documentElement.classList.remove("light");
+    }
+  };
+
   useEffect(() => {
     const userId = localStorage.getItem("userId");
     const token = localStorage.getItem("token");
@@ -87,6 +102,18 @@ const Home = () => {
         </h1>
 
         <div className="flex flex-wrap gap-3 sm:gap-6 items-center font-medium">
+          {/* THEME TOGGLE: ☀️ SUN / 🌙 MOON (FIRST AT NAVBAR BEFORE PRACTISE) */}
+          <button
+            onClick={toggleTheme}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-white/10 hover:bg-white/20 border border-white/20 text-xs font-mono font-bold transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-sm"
+            title={`Switch to ${theme === "dark" ? "Light" : "Dark"} Mode`}
+          >
+            <span className="text-sm">{theme === "dark" ? "☀️" : "🌙"}</span>
+            <span className="hidden sm:inline font-mono text-[11px] uppercase tracking-wider">
+              {theme === "dark" ? "Light" : "Dark"}
+            </span>
+          </button>
+
           {[
             { label: "Practise", path: "/problems" },
             { label: "Daily Challenge", path: "/daily-blitz" },
@@ -139,9 +166,6 @@ const Home = () => {
                   <>
                     <button onClick={() => navigate("/login")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">Login</button>
                     <button onClick={() => navigate("/signup")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">Sign Up</button>
-                    <button onClick={() => navigate("/admin/login")} className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-400 hover:text-red-300 transition text-xs font-mono flex items-center gap-2 border-t border-white/10">
-                      <FaShieldAlt size={12} /> Admin Login
-                    </button>
                   </>
                 ) : (
                   <>
@@ -151,9 +175,6 @@ const Home = () => {
                     </div>
                     <button onClick={() => navigate("/contest-management")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs font-mono text-orange-400">Contest Manager</button>
                     <button onClick={() => navigate("/profile")} className="w-full text-left px-4 py-3 hover:bg-white/5 transition text-xs">My Profile</button>
-                    <button onClick={() => navigate("/admin/login")} className="w-full text-left px-4 py-2.5 hover:bg-red-500/10 text-red-400 hover:text-red-300 transition text-xs font-mono flex items-center gap-2 border-t border-white/10">
-                      <FaShieldAlt size={12} /> Admin Portal
-                    </button>
                     <button onClick={logout} className="w-full text-left px-4 py-3 hover:bg-red-500/10 text-red-500 transition text-xs font-bold">Logout</button>
                   </>
                 )}

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import SplashScreen from "./Pages/SplashScreen.jsx";
 import Home from "./Pages/Home.jsx";
 import Login from "./Pages/Login.jsx";
@@ -24,6 +24,15 @@ import AdminUsers from "./Admin/AdminUsers.jsx";
 
 function App() {
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const savedTheme = localStorage.getItem("battlix_theme") || "dark";
+    if (savedTheme === "light") {
+      document.documentElement.classList.add("light");
+    } else {
+      document.documentElement.classList.remove("light");
+    }
+  }, []);
 
   return (
     <BrowserRouter>
